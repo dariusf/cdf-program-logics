@@ -132,7 +132,7 @@ Proof.
   destruct (h l); auto.
 Qed.
 
-Lemma hfree_hunion_hupdate:
+(* Lemma hfree_hunion_hupdate:
   forall h l v,
   hdisjoint (hupdate l v hempty) h ->
   hfree l (hunion (hupdate l v hempty) h) = h.
@@ -150,7 +150,7 @@ Proof.
       discriminate H0.
     + auto.
   - destruct (h l0); auto.
-Qed.
+Qed. *)
 
 Lemma hdisjoint_empty:
   forall h, hdisjoint hempty h.

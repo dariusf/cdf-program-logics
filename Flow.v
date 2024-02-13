@@ -14,12 +14,13 @@ Definition flow : Type := heap -> heap -> Prop.
 Definition fexists {A: Type} (P: A -> flow) : flow :=
   fun h1 h2 => exists a: A, P a h1 h2.
 
-(* Print assertion. *)
-Definition freq (P: precond) : flow :=
+(* h3 is the part of the heap that is taken away by req,
+   h4 is what is left *)
+Definition freq (P: precond) (k : flow) : flow :=
   fun h1 h2 => exists h3 h4,
-    h1 = hunion h3 h4 /\ hdisjoint h3 h4 /\ P h3 /\ h2 = h4.
-    (* h3 is the part of the heap that is taken away by req,
-    h4 is what is left *)
+    h1 = hunion h3 h4 /\ hdisjoint h3 h4 /\ P h3
+    ->
+    k h4 h2.
 
 Definition fens (P: postcond) : flow :=
   fun h1 h2 => exists h3,
@@ -29,8 +30,8 @@ Definition fens (P: postcond) : flow :=
 Definition fempty : flow := fens (fun r h => True).
 
 Definition fseq (f1 f2 : flow) : flow :=
-  (* fun h1 h2 => exists h3, f1 h1 h3 /\ f2 h3 h2. *)
-  fun h1 h2 => exists h3, f1 h1 h3 -> f2 h3 h2.
+  fun h1 h2 => exists h3, f1 h1 h3 /\ f2 h3 h2.
+  (* fun h1 h2 => exists h3, f1 h1 h3 -> f2 h3 h2. *)
 
 Infix ";;" := fseq (at level 80, right associativity).
 
@@ -46,11 +47,11 @@ Inductive forward : com -> flow -> Prop :=
   | fw_skip:
     forward SKIP fempty
   | fw_pure: forall n,
-    forward (PURE n) (fens (fun res h => res = n))
+    forward (PURE n) (fens (fun res => pure (res = n)))
   | fw_get: forall l v, 
     forward (GET l)
-      (freq (fun h => h = hsingle l v) ;;
-      fens (fun r h => h = hsingle l v /\ r = v))
+      (freq (contains l v)
+      (fens (fun r => pureconj (r = v) (contains l v))))
 
   (* | fw_set: forall f l v, *)
     (* forward f (SET l v) f *)
@@ -73,7 +74,7 @@ Qed. *)
 Ltac inv H := inversion H; clear H; subst.
 
 Theorem soundness : forall f c1 c2 h1 h2,
-(* doesn't work for stuff that doesn't reduce, like pure *)
+(* TODO doesn't say anything about stuff that doesn't reduce, like pure *)
   red (c1, h1) (c2, h2) ->
   forward c1 f ->
   f h1 h2.
@@ -89,15 +90,16 @@ Proof.
 
   (* assuming we start in state h2 *)
   (* the intermediate states in sequencing are also h2 *)
-  unfold fseq.
+  (* unfold fseq. *)
   (* exists h2. *)
   (* intros hist. *)
-  exists (hfree l h2).
 
   (* now partition the heap into h2 and emp,
   and assume there is h2[l:=v] *)
   unfold freq.
-  intros [h3 [h4 [Hu [Hd [Hg He]]]]].
+  exists (hsingle l v).
+  exists (hfree l h2).
+  intros [h3 [h4 Hd]].
   subst.
   (* h2 is now called h0, and h4 is empty *)
 
@@ -109,15 +111,9 @@ Proof.
   split.
   split; reflexivity.
   split.
-  rewrite He.
-  rewrite hunion_comm.
-  reflexivity.
-  rewrite hdisjoint_sym; auto.
-  unfold hsingle in *.
-  pose proof hfree_hunion_hupdate as hh.
-  rewrite hfree_hunion_hupdate.
-  rewrite hdisjoint_sym; auto.
-  auto.
+  + rewrite hunion_comm; auto.
+  + rewrite hdisjoint_sym; auto.
 Qed.
+(* Admitted. *)
 
 End Flow.
