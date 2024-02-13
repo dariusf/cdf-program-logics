@@ -6,3 +6,4 @@ Seplog.v
 CSL.v
 Delay.v
 Monads.v
+Trace.v
