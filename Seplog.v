@@ -2,7 +2,7 @@
 
 From Coq Require Import ZArith Lia Bool List Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Sequences Separation.
+From CDF Require Import Separation.
 
 Local Open Scope Z_scope.
 

@@ -55,6 +55,9 @@ Proof.
   intros; cbn. destruct (Z.eq_dec l l'); congruence.
 Qed.
 
+Definition hsingle (l: addr) (v: Z) : heap :=
+  hupdate l v hempty.
+
 (** The heap [h] after deallocating address [l]. *)
 
 Program Definition hfree (l: addr) (h: heap) : heap :=
@@ -120,6 +123,42 @@ Lemma hunion_empty:
   forall h, hunion hempty h = h.
 Proof.
   intros; apply heap_extensionality; intros; cbn. auto.
+Qed.
+
+Lemma hunion_refl:
+  forall h, hunion h h = h.
+Proof.
+  intros; apply heap_extensionality; intros; cbn.
+  destruct (h l); auto.
+Qed.
+
+Lemma hfree_hunion_hupdate:
+  forall h l v,
+  hdisjoint (hupdate l v hempty) h ->
+  hfree l (hunion (hupdate l v hempty) h) = h.
+Proof.
+  intros; apply heap_extensionality; intros; cbn.
+  (* l is the location that is not in h *)
+  (* l0 is an arb location *)
+  destruct (Z.eq_dec l l0).
+  - (* suppose l0 is the location that is not in h.
+      use disjointness to show l0/l is not in h *)
+    subst.
+    unfold hdisjoint in H.
+    pose proof (H l0) as H0; destruct H0.
+    + rewrite hupdate_same in H0.
+      discriminate H0.
+    + auto.
+  - destruct (h l0); auto.
+Qed.
+
+Lemma hdisjoint_empty:
+  forall h, hdisjoint hempty h.
+Proof.
+  intros.
+  unfold hdisjoint; intros.
+  left.
+  reflexivity.
 Qed.
 
 Lemma hdisjoint_union_l:
