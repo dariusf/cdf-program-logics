@@ -1,7 +1,7 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Separation Seplog.
+From CDF Require Import Sequences Separation Seplog.
 
 Local Open Scope string_scope.
 Local Open Scope nat_scope.
@@ -51,7 +51,8 @@ Inductive forward : com -> flow -> Prop :=
   | fw_get: forall l v, 
     forward (GET l)
       (freq (contains l v)
-      (fens (fun r => pureconj (r = v) (contains l v))))
+      (fens (fun r => (r = v) //\\ contains l v)))
+
 
   (* | fw_set: forall f l v, *)
     (* forward f (SET l v) f *)
@@ -59,6 +60,14 @@ Inductive forward : com -> flow -> Prop :=
     (* forward f (LET e1 e2) f *)
 
   .
+
+Inductive satisfies : heap -> flow -> heap -> Prop :=
+  | m_req: forall h1 h2 p k,
+    satisfies h1 (freq p k) h2
+  | m_ens: forall h1 h2 q,
+    satisfies h1 (fens q) h2
+
+.
 
 (* Example e1 : forall h1 h2, red (PURE 0, h1) (PURE 0, h2).
 intros.
@@ -71,9 +80,34 @@ Qed. *)
 
 (* red is a small step relation, soundness eventually needs to be proved for star red *)
 
-Ltac inv H := inversion H; clear H; subst.
+(* Ltac inv H := inversion H; clear H; subst. *)
 
-Theorem soundness : forall f c1 c2 h1 h2,
+Definition terminated (c: com) : Prop :=  c = SKIP.
+
+Definition terminates (c1: com) (h1 h2: heap) : Prop :=
+  exists c2, star red (c1, h1) (c2, h2) /\ terminated c2.
+
+(* Definition goeswrong (c1: com) (h1: heap) : Prop :=
+  exists c2 h2, star red (c1, h1) (c2, h2) /\ error c2 h2. *)
+
+(* Fixpoint error (c: com) (s: heap) : Prop :=
+  match c with
+  | ASSERT b => beval b s = false
+  | (c1 ;; c2) => error c1 s
+  | _ => False
+  end. *)
+
+
+Theorem soundness : forall f c1 h1 h2 h3,
+  forward c1 f ->
+  terminates c1 h1 h2 ->
+  satisfies h1 f h3 ->
+  h2 = h3.
+Proof.
+admit.
+Admitted.
+
+Theorem soundness0 : forall f c1 c2 h1 h2,
 (* TODO doesn't say anything about stuff that doesn't reduce, like pure *)
   red (c1, h1) (c2, h2) ->
   forward c1 f ->
