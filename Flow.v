@@ -163,7 +163,7 @@ Module Flow2.
     
   (* h3 is the part of the heap that is taken away by req,
     h4 is what is left *)
-  Definition freq (P: precond) : flow :=
+  (* Definition freq (P: precond) : flow :=
     fun h1 h2 p r =>
         (exists h3 h4, h1 = hunion h3 h4
           /\ hdisjoint h3 h4
@@ -171,7 +171,17 @@ Module Flow2.
         \/
         (forall h3 h4, h1 = hunion h3 h4
           /\ hdisjoint h3 h4
-          /\ not (P h3) -> p = false).
+          /\ not (P h3) -> p = false). *)
+
+  Definition freq (P: precond) : flow :=
+    fun h1 h2 p r =>
+        (exists h3 h4, h1 = hunion h3 h4
+          /\ hdisjoint h3 h4
+          /\ P h3 -> h2 = h4 /\ p = true)
+        /\
+        (not (exists h3 h4, h1 = hunion h3 h4
+          /\ hdisjoint h3 h4
+          /\ P h3) -> p = false).
 
   Definition fens (P: postcond) : flow :=
     fun h1 h2 p r =>
