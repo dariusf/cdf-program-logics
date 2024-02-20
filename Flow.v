@@ -27,12 +27,12 @@ Ltac heap := HUNION; HDISJ; auto.
 Ltac destr H :=
   match type of H with
   | ex _ =>
-    let L := fresh "e" in
-    let R := fresh "H" in
+    let L := fresh in
+    let R := fresh in
     destruct H as [L R]; destr R
   | _ /\ _ =>
-    let L := fresh "L" in
-    let R := fresh "R" in
+    let L := fresh in
+    let R := fresh in
     destruct H as [L R]; destr L; destr R
   | _ => idtac
   end.
@@ -97,16 +97,16 @@ Proof.
     (* both ways to produce an ens: skip and pure *)
     - inv Ht.
       inv H.
-      destr H1. destruct R0. unfold emp in H1. inv H0.
+      destr H1. destruct H3. unfold emp in H3. inv H0.
       (* skip has terminated *)
-      { inv H2.
+      { inv H4.
       - heap.
       - inv H.
       }
     - inv Ht. destr H. destr H0.
-      { inv L1.
-      - destruct R0. unfold emp in H0. subst. heap.
-      - inv H. 
+      { inv H3.
+      - destruct H4. unfold emp in H0. subst. heap.
+      - inv H0. 
       }
   }
   - inv Hf.
@@ -114,16 +114,16 @@ Proof.
   inv Ht.
   destr H.
   (* see how get reduces *)
-  { inv L.
-  - inv R. (* get does reduce *)
+  { inv H0.
+  - inv H1. (* get does reduce *)
   - inv H.
-    { inv H0.
-    - inv R.
+    { inv H2.
+    - inv H1.
       (* h0 -> h2 -> h3 *)
-      inv Hs1. destr H0. inv Hs2. destr H0. subst.
-      unfold contains in R0.
-      destruct R1.
-      unfold contains in H0.
+      inv Hs1. destr H0. inv Hs2. destr H4. subst.
+      unfold contains in H3.
+      destruct H7.
+      unfold contains in H6.
       subst.
       reflexivity.
     - inv H.
