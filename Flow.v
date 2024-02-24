@@ -1,25 +1,63 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Sequences Separation Seplog.
+From CDF Require Import Common Sequences Separation2.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
-Ltac HUNION :=
-  match goal with
-  | [ |- _ = hunion hempty _ ] =>
-      rewrite hunion_empty; idtac 1; HUNION
-  | [ |- _ = hunion _ hempty ] =>
-      idtac 4; rewrite hunion_comm;
-      HUNION
-      (* rewrite hunion_empty; idtac 2; HUNION *)
-  | _ => idtac 3; auto
+Ltac inv H := inversion H; clear H; subst.
+
+Ltac HUNION n :=
+  match n with
+  | O => idtac "out of fuel"
+  | S ?n' =>
+  intuition;
+    match goal with
+    | [ H: _ = hunion hempty _ |- _ ] =>
+    (* let t := type of H in idtac "empty" t n'; *)
+        rewrite hunion_empty in H;
+        HUNION n'
+    | [ H: _ = hunion _ hempty |- _ ] =>
+        rewrite hunion_comm in H;
+        HDISJ;
+        rewrite hunion_empty in H;
+        HUNION n'
+    | [ |- _ = hunion hempty _ ] =>
+        rewrite hunion_empty; HUNION n'
+    | [ |- hunion hempty _ = _ ] =>
+        rewrite hunion_empty; HUNION n'
+    | [ |- _ = hunion _ hempty ] =>
+        rewrite hunion_comm; HDISJ; rewrite hunion_empty; HUNION n'
+    | [ |- hunion _ hempty = _ ] =>
+        rewrite hunion_comm; HDISJ;
+        rewrite hunion_empty;
+        HUNION n'
+    | [ |- ?g ] => auto
+    end
   end.
 
-Ltac heap := HUNION; HDISJ; auto.
+Ltac heap := HUNION (3%nat); HDISJ; auto.
+
+(* Ltac HUNION1 n :=
+  match n with
+  | O => idtac "out of fuel"
+  | S ?n' =>
+    match goal with
+    | [ H: _ = hunion ?b hempty |- _ ] =>
+        let t := type of H in idtac "comm" t n';
+        rewrite hunion_comm in H;
+        let t := type of H in idtac "comm 1" t n';
+        HDISJ;
+        let t := type of H in idtac "comm 2" t n';
+        rewrite hunion_empty in H;
+        let t := type of H in idtac "comm after" t;
+        HUNION1 n'
+    | [ |- ?g ] => idtac "goal" g; auto
+    end
+  end. *)
 
 (* Ltac rw := rewrite. *)
 (* Ltac con := constructor. *)
@@ -39,7 +77,6 @@ Ltac destr H :=
 
 Module Flow3.
 
-  Definition ident := string.
   Definition val := Z.
 
   Inductive expr : Type :=
@@ -51,11 +88,6 @@ Module Flow3.
     | passign (x1: ident) (x2: ident)
     | pif (x: ident) (e1: expr) (e2: expr)
     .
-
-  Definition store : Type := ident -> Z.
-  Definition sempty : store := (fun _ => -1).
-  Definition supdate (x: ident) (v: Z) (s: store) : store :=
-    fun y => if string_dec x y then v else s y.
 
   Inductive eresult : Type :=
     | enorm : val -> eresult
@@ -98,22 +130,8 @@ Module Flow3.
 
   End ProgramExamples.
 
-  Inductive sl : Type :=
-  | pts : ident -> ident -> sl
-  | sep : sl -> sl -> sl
-  .
-
-  Inductive sl_satisfies : store -> heap -> sl -> Prop :=
-  | sl_pts : forall s h x y,
-    contains (s x) (s y) h ->
-    sl_satisfies s h (pts x y)
-  (* | sl_sep : forall s h x y,
-    contains (s x) (s y) h ->
-    sl_satisfies s h (sep p q) *)
-  .
-
-  (* Definition precond := sl. *)
-  (* Definition postcond := sl. *)
+Definition precond := assertion.
+Definition postcond := Z -> assertion.
 
   Inductive flow : Type :=
   (* | req : precond -> flow *)
@@ -131,39 +149,106 @@ Module Flow3.
   .
 
   (* axiomatization of semantics for staged formulae *)
-  Inductive satisfies : bool -> heap -> bool -> heap -> result -> flow -> Prop :=
-    | sem_req: forall h3 p h1 r,
-      (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ p h2) ->
-      satisfies true h3 true h1 (norm r) (req p)
-    | sem_ens: forall h1 h3 q v,
-      (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\
-      q v h2) ->
-      satisfies true h1 true h3 (norm v) (ens q)
-    | sem_seq: forall f1 f2 r r1 h1 h2 h3 c,
-      satisfies true h1 true h2 r f1 ->
-      satisfies true h2 c h3 r1 f2 ->
-      satisfies true h1 c h3 r1 (f1;;f2)
+  Inductive satisfies : bool -> store -> heap -> bool -> store -> heap -> result -> flow -> Prop :=
+    | sem_req: forall h3 p s1 s2 h1 r,
+      (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ p s1 h2) ->
+      satisfies true s1 h3 true s2 h1 (norm r) (req p)
+    | sem_ens: forall h1 h3 q v s,
+      (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ q v s h2) ->
+      satisfies true s h1 true s h3 (norm v) (ens q)
+    | sem_seq: forall f1 f2 r r1 h1 h2 h3 c s s1 s2,
+      satisfies true s h1 true s1 h2 r f1 ->
+      satisfies true s1 h2 c s2 h3 r1 f2 ->
+      satisfies true s h1 c s2 h3 r1 (f1;;f2)
   .
 
     (* forward rules say how to produce a staged formula from a program *)
     Inductive forward : expr -> flow -> Prop :=
       | fw_const: forall n,
         forward (pconst n) (ens (fun res => (res = n) //\\ emp))
+      | fw_var: forall x,
+        forward (pvar x) (ens (fun res s h => res = s x /\ emp s h))
       | fw_deref: forall x z,
-        forward (pderef x) (req (contains x z);; ens (fun res => (res = z) //\\ contains x z))
+        forward (pderef x) (req (ptsval x z);;
+        ens (fun res => (res = z) //\\ ptsval x z))
+
       (* | fw_get: forall l v, 
         forward (GET l)
           (req (contains l v) ;;
           (ens (fun r => (r = v) //\\ contains l v))) *)
     .
 
-    (* Theorem soundness : forall h1 c h3 r f,
-      satisfies true h1 c h3 r f ->
-      forall e1 h2,
-      (* forward e1 f -> *)
-      (* bigstep s h e1 h1 h2 -> *)
-      h2 = h3.
+(* {ens emp} e {\phi}, 
+SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
+[S, h, e] -----> [S2, h2, R2], R2!=\bot, 
+such that: 
+\exists (check, s3, h3, R3) \in SH, s3 \subset s2, h3 \subset h2, R2=R1 *)
+    Theorem soundness : forall e f s1 s2 s3 h1 h2 h3 r1 r2,
+      bigstep s1 h1 e s3 h3 (enorm r2) ->
+      forward e f ->
+      satisfies true s1 h1 true s2 h2 (norm r1) f ->
+      s2 = s3 /\ h2 = h3 /\ r1 = r2.
+      (* forall f h3 r, *)
     Proof.
+      intros e f s1 s2 s3 h1 h2 h3 r1 r2 Hb.
+      (* inv Hb. *)
+      (* generalize dependent f.
+      generalize dependent s2.
+      generalize dependent h2.
+      generalize dependent r1. *)
+      (* https://stackoverflow.com/questions/4519692/keeping-information-when-using-induction *)
+      remember (enorm r2) as t1 in Hb.
+      induction Hb; intros.
+      -
+ injection Heqt1; intros.
+ (* applyf_equal Heqt1. *)
+      inv H.
+      inv H0.
+      destr H4.
+      unfold emp in H4.
+      (* subst. *)
+      rewrite H4 in H1.
+      (* rewrite hunion_comm in H1. *)
+      (* rewrite hunion_empty in H1. *)
+      (* HUNION1 (3)%nat. *)
+      heap.
+      (* heap. *)
+      (* heap. *)
+      (* auto. *)
+      (* rewrite hunion_empty in H1; *)
+      (* heap. *)
+      (* intuition heap. *)
+      (* HDISJ. *)
+
+      (* intuition heap. *)
+      (* apply sem_ens. *)
+      (* exists hempty. *)
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+      - admit.
+    Admitted.
+
+    (* Theorem soundness : forall s1 h e1 s2 h1 h2,
+      bigstep s1 h e1 s2 h1 h2 ->
+      forall f h3 r,
+      forward e1 f ->
+      satisfies true s1 h1 true s2 h3 (norm r) f.
+    Proof.
+     intros s h e1 s1 h1 h2 Hb.
+     induction Hb; intros.
+     - inv H.
+     apply sem_ens.
+     exists hempty.
+      admit.
+      admit.
+      admit.
+     - admit.
+     - admit.
+     - admit.
+     - admit.
+     - admit.
     Admitted. *)
 
 
@@ -172,7 +257,7 @@ Module Flow3.
       satisfies true hempty true hempty (norm x) (req emp).
     Proof.
       exists 1.
-      constructor.
+      apply sem_req with (s := sempty).
       auto.
       exists hempty.
       repeat split; heap.
@@ -181,7 +266,7 @@ Module Flow3.
     Example ex_spec_ens_1:
       satisfies true hempty true hempty (norm 1) (ens (fun r => (r = 1) //\\ emp)).
     Proof.
-      apply sem_ens.
+      apply sem_ens with (s := sempty).
       exists hempty.
       repeat split; heap.
     Qed.
@@ -192,83 +277,15 @@ Module Flow3.
     Proof.
       intros.
       apply sem_seq with (h2 := hempty) (r := norm 3).
-      - constructor.
+      - apply sem_req with (s := sempty).
       exists (hupdate x 1 hempty).
       repeat split.
       heap.
       heap.
-      - apply sem_ens.
+      - apply sem_ens with (s := sempty).
       exists (hupdate x 1 hempty).
       repeat split; heap.
     Qed.
   End SpecExamples.
-
-  Module Original.
-    (* forward rules say how to produce a staged formula from a program *)
-    Inductive forward : com -> flow -> Prop :=
-      | fw_skip:
-        forward SKIP (ens (fun res => (res = 0) //\\ emp))
-      | fw_pure: forall n,
-        forward (PURE n) (ens (fun res => (res = n) //\\ emp))
-      | fw_get: forall l v, 
-        forward (GET l)
-          (req (contains l v) ;;
-          (ens (fun r => (r = v) //\\ contains l v)))
-    .
-
-    Definition terminated (c: com) : Prop :=  c = SKIP.
-
-    Definition terminates (c1: com) (h1 h2: heap) : Prop :=
-      exists c2, star red (c1, h1) (c2, h2) /\ terminated c2.
-
-    Theorem soundness : forall h1 c h3 r f,
-      satisfies true h1 c h3 r f ->
-      forall e1 h2,
-      forward e1 f ->
-      terminates e1 h1 h2 ->
-      h2 = h3.
-    Proof.
-      intros h1 c h3 r f Hs.
-      induction Hs; intros e1 h0 Hf Ht.
-      - inv Hf.
-      - { inv Hf.
-        (* both ways to produce an ens: skip and pure *)
-        - inv Ht.
-          inv H.
-          destr H1. destruct H3. unfold emp in H3. inv H0.
-          (* skip has terminated *)
-          { inv H4.
-          - heap.
-          - inv H.
-          }
-        - inv Ht. destr H. destr H0.
-          { inv H3.
-          - destruct H4. unfold emp in H0. subst. heap.
-          - inv H0. 
-          }
-      }
-      - inv Hf.
-      (* only one case for forward rules that produces a seq, which is get *)
-      inv Ht.
-      destr H.
-      (* see how get reduces *)
-      { inv H0.
-      - inv H1. (* get does reduce *)
-    - inv H.
-      { inv H2.
-      - inv H1.
-        (* h0 -> h2 -> h3 *)
-        inv Hs1. destr H0. inv Hs2. destr H4. subst.
-        unfold contains in H3.
-        destruct H7.
-        unfold contains in H6.
-        subst.
-        reflexivity.
-      - inv H.
-      }
-    }
-    (* Admitted. *)
-    Qed.
-  End Original.
 
 End Flow3.

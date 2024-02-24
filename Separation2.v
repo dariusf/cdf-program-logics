@@ -2,6 +2,7 @@
 
 From Coq Require Import ZArith Lia Bool String List.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
+From CDF Require Import Common.
 
 Local Open Scope Z_scope.
 
@@ -229,38 +230,45 @@ Qed.
 
 (** * 2. Assertions for separation logic *)
 
-Definition assertion : Type := heap -> Prop.
+Definition assertion : Type := store -> heap -> Prop.
 
 (** Implication (entailment). *)
 
 Definition aimp (P Q: assertion) : Prop :=
-  forall h, P h -> Q h.
+  forall s h, P s h -> Q s h.
 
 Notation "P -->> Q" := (aimp P Q) (at level 95, no associativity).
 
 (** Quantification. *)
 
 Definition aexists {A: Type} (P: A -> assertion) : assertion :=
-  fun h => exists a: A, P a h.
+  fun s h => exists a: A, P a s h.
 
 Definition aforall {A: Type} (P: A -> assertion) : assertion :=
-  fun h => forall a: A, P a h.
+  fun s h => forall a: A, P a s h.
 
 (** The assertion "the heap is empty". *)
 
 Definition emp : assertion :=
-  fun h => h = hempty.
+  fun s h => h = hempty.
 
 (** The pure assertion: "the heap is empty and P holds". *)
 
 Definition pure (P: Prop) : assertion :=
-  fun h => P /\ h = hempty.
+  fun s h => P /\ h = hempty.
+  (* TODO pure assertions *)
 
 (** The assertion "address [l] contains value [v]". 
     The domain of the heap must be the singleton [{l}]. *)
 
 Definition contains (l: addr) (v: Z) : assertion :=
-  fun h => h = hupdate l v hempty.
+  fun s h => h = hupdate l v hempty.
+
+Definition pts (x: ident) (y: ident) : assertion :=
+  fun s h => contains (s x) (s y) s h.
+
+Definition ptsval (x: ident) (v: Z) : assertion :=
+  fun s h => contains (s x) v s h.
 
 (** The assertion "address [l] is valid" (i.e. in the domain of the heap). *)
 
@@ -269,8 +277,8 @@ Definition valid (l: addr) : assertion := aexists (contains l).
 (** The separating conjunction. *)
 
 Definition sepconj (P Q: assertion) : assertion :=
-  fun h => exists h1 h2, P h1
-                      /\ Q h2
+  fun s h => exists h1 h2, P s h1
+                      /\ Q s h2
                       /\ hdisjoint h1 h2  /\ h = hunion h1 h2.
 
 Notation "P ** Q" := (sepconj P Q) (at level 60, right associativity).
@@ -278,24 +286,26 @@ Notation "P ** Q" := (sepconj P Q) (at level 60, right associativity).
 (** The conjunction of a simple assertion and a general assertion. *)
 
 Definition pureconj (P: Prop) (Q: assertion) : assertion :=
-  fun h => P /\ Q h.
+  fun s h => P /\ Q s h.
+  (* TODO pure assertions *)
 
 Notation "P //\\ Q" := (pureconj P Q) (at level 60, right associativity).
 
 (** Plain conjunction and disjunction. *)
 
 Definition aand (P Q: assertion) : assertion :=
-  fun h => P h /\ Q h.
+  fun s h => P s h /\ Q s h.
 Definition aor (P Q: assertion) : assertion :=
-  fun h => P h \/ Q h.
+  fun s h => P s h \/ Q s h.
 
 (** Extensional equality between assertions. *)
 
 Lemma assertion_extensionality:
   forall (P Q: assertion),
-  (forall h, P h <-> Q h) -> P = Q.
+  (forall s h, P s h <-> Q s h) -> P = Q.
 Proof.
-  intros. apply functional_extensionality. intros h.
+  intros. apply functional_extensionality. intros s.
+  apply functional_extensionality. intros h.
   apply propositional_extensionality. auto.
 Qed.
 
@@ -303,8 +313,8 @@ Qed.
 
 Lemma sepconj_comm: forall P Q, P ** Q = Q ** P.
 Proof.
-  assert (forall P Q h, (P ** Q) h -> (Q ** P) h).
-  { intros P Q h (h1 & h2 & P1 & Q2 & EQ & DISJ); subst h.
+  assert (forall P Q s h, (P ** Q) s h -> (Q ** P) s h).
+  { intros P Q s h (h1 & h2 & P1 & Q2 & EQ & DISJ); subst h.
     exists h2, h1; intuition auto.
     apply hdisjoint_sym; auto.
     symmetry; apply hunion_comm; auto. } 
@@ -340,7 +350,7 @@ Qed.
 Lemma sepconj_imp_l: forall P Q R,
   (P -->> Q) -> (P ** R -->> Q ** R).
 Proof.
-  intros P Q R IMP h (h1 & h2 & P1 & Q2 & D & U).
+  intros P Q R IMP s h (h1 & h2 & P1 & Q2 & D & U).
   exists h1, h2; intuition auto.
 Qed.
 
@@ -414,21 +424,21 @@ Qed.
 (** ** Magic wand *)
 
 Definition wand (P Q: assertion) : assertion :=
-  fun h => forall h', hdisjoint h h' -> P h' -> Q (hunion h h').
+  fun s h => forall h', hdisjoint h h' -> P s h' -> Q s (hunion h h').
 
 Notation "P --* Q" := (wand P Q) (at level 70, right associativity).
 
 Lemma wand_intro: forall P Q R,
   P ** Q -->> R  ->  P -->> Q --* R.
 Proof.
-  intros P Q R IMP h Ph h' DISJ Qh'.
+  intros P Q R IMP s h Ph h' DISJ Qh'.
   apply IMP. exists h, h'; auto.
 Qed.
 
 Lemma wand_cancel: forall P Q,
   P ** (P --* Q) -->> Q.
 Proof.
-  intros P Q h (h1 & h2 & Ph1 & Wh2 & D & U). subst h.
+  intros P Q s h (h1 & h2 & Ph1 & Wh2 & D & U). subst h.
   assert (D': hdisjoint h2 h1) by (apply hdisjoint_sym; auto).
   rewrite hunion_comm by auto. apply Wh2; auto.
 Qed.
@@ -436,7 +446,7 @@ Qed.
 Lemma wand_charact: forall P Q,
   (P --*Q) = (aexists (fun R => (P ** R -->> Q) //\\ R)).
 Proof.
-  intros P Q; apply assertion_extensionality; intros h; split.
+  intros P Q; apply assertion_extensionality; intros s h; split.
 - intros W. exists (P --* Q). split; auto. apply wand_cancel.
 - intros (R & A & B) h' D Ph'.
   assert (D': hdisjoint h' h) by (apply hdisjoint_sym; auto).
@@ -447,7 +457,7 @@ Lemma wand_equiv: forall P Q R,
   (P -->> (Q --* R)) <-> (P ** Q -->> R).
 Proof.
   intros; split; intros H.
-- intros h (h1 & h2 & Ph1 & Wh2 & D & U). subst h.
+- intros s h (h1 & h2 & Ph1 & Wh2 & D & U). subst h.
   apply H; auto.
 - apply wand_intro; auto.
 Qed.
@@ -455,19 +465,19 @@ Qed.
 Lemma wand_imp_l: forall P P' Q,
   (P' -->> P) -> (P --* Q -->> P' --* Q).
 Proof.
-  intros. intros h W h' DISJ P'h'. apply W; auto.
+  intros. intros s h W h' DISJ P'h'. apply W; auto.
 Qed.
 
 Lemma wand_imp_r: forall P Q Q',
   (Q -->> Q') -> (P --* Q -->> P --* Q').
 Proof.
-  intros. intros h W h' DISJ Ph'. apply H; apply W; auto.
+  intros. intros s h W h' DISJ Ph'. apply H; apply W; auto.
 Qed.
 
 Lemma wand_idem: forall P,
   emp -->> P --* P.
 Proof.
-  intros P h E. rewrite E. red. intros. rewrite hunion_empty. auto.
+  intros P s h E. rewrite E. red. intros. rewrite hunion_empty. auto.
 Qed.
 
 Lemma wand_pure_l: forall (P: Prop) Q,
@@ -490,7 +500,7 @@ Qed.
 Lemma wand_star: forall P Q R,
   ((P --* Q) ** R ) -->> (P --* (Q ** R)).
 Proof.
-  intros; intros h (h1 & h2 & W1 & R2 & D & U). subst h. intros h' D' Ph'.
+  intros; intros s h (h1 & h2 & W1 & R2 & D & U). subst h. intros h' D' Ph'.
   exists (hunion h1 h'), h2; intuition auto.
   apply W1; auto. HDISJ.
   HDISJ.
@@ -501,7 +511,7 @@ Qed.
 
 (** An assertion is precise if "it unambiguously carves out an area of the heap"
    (in the words of Gotsman, Berdine, Cook, 2011). *)
-
+(*
 Definition precise (P: assertion) : Prop :=
   forall h1 h2 h1' h2',
   hdisjoint h1 h2 -> hdisjoint h1' h2' -> hunion h1 h2 = hunion h1' h2' ->
@@ -636,3 +646,5 @@ Proof.
   assert (h = h1). { apply heap_extensionality; intros l. rewrite E; cbn. destruct (h1 l); auto. }
   congruence.
 Qed.
+
+*)
