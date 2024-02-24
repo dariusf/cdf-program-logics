@@ -8,6 +8,22 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
+(* some old tactics *)
+
+(* Tactic Notation "inv" constr(h) := inversion h; subst. *)
+Tactic Notation "inj" constr(h) := injection h as h; subst.
+Tactic Notation "ok" := auto; try easy.
+
+(* these could be made less powerful in future, so they can't be used wrongly *)
+Tactic Notation "vacuous" := easy.
+(* Tactic Notation "ih" := ok. *)
+
+Tactic Notation "case_on" constr(e) := let H := fresh in destruct e eqn:H; ok.
+Tactic Notation "case_on" constr(e) ident(x) := destruct e eqn:x; ok.
+(* Tactic Notation "gen" ident_list(x) := generalize dependent x. *)
+
+(* new ones *)
+
 Ltac inv H := inversion H; clear H; subst.
 
 Ltac HUNION n :=
@@ -40,24 +56,6 @@ Ltac HUNION n :=
   end.
 
 Ltac heap := HUNION (3%nat); HDISJ; auto.
-
-(* Ltac HUNION1 n :=
-  match n with
-  | O => idtac "out of fuel"
-  | S ?n' =>
-    match goal with
-    | [ H: _ = hunion ?b hempty |- _ ] =>
-        let t := type of H in idtac "comm" t n';
-        rewrite hunion_comm in H;
-        let t := type of H in idtac "comm 1" t n';
-        HDISJ;
-        let t := type of H in idtac "comm 2" t n';
-        rewrite hunion_empty in H;
-        let t := type of H in idtac "comm after" t;
-        HUNION1 n'
-    | [ |- ?g ] => idtac "goal" g; auto
-    end
-  end. *)
 
 (* Ltac rw := rewrite. *)
 (* Ltac con := constructor. *)
@@ -93,34 +91,33 @@ Module Flow3.
     | enorm : val -> eresult
   .
 
+  Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
+
   Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     | eval_pvar : forall s h x,
-      bigstep s h (pvar x) s h (enorm (s x))
+      eval[ s, h, pvar x ]=>[ s, h, enorm (s x)]
     | eval_pconst : forall s h x,
-      bigstep s h (pconst x) s h (enorm x)
+      eval[ s, h, pconst x ] => [ s, h, enorm x]
     | eval_plet : forall x e1 e2 v s h h2 s2 s1 h1 r,
-      bigstep s h e1 s1 h1 (enorm v) ->
-      bigstep (supdate x v s1) h1 e2 s2 h2 r ->
-      bigstep s h (plet x e1 e2) s h2 r
+      eval[ s, h, e1 ] => [ s1, h1, enorm v] ->
+      eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r] ->
+      eval[ s, h, plet x e1 e2 ] => [ s, h2, r ]
     | eval_pref : forall x s (h:heap) l,
       h l = None ->
-      bigstep s h (pref x) s (hupdate l (s x) h) (enorm l)
+      eval[ s, h, pref x ] => [ s, hupdate l (s x) h, enorm l]
     | eval_deref : forall x s (h:heap) v,
       h (s x) = Some v ->
-      bigstep s h (pderef x) s h (enorm v)
+      eval[ s, h, pderef x ] => [ s, h, enorm v]
     | eval_assign : forall x1 x2 s h,
-      bigstep s h (passign x1 x2) s (hupdate (s x1) (s x2) h) (enorm 0)
+      eval[ s, h, passign x1 x2 ] => [ s, hupdate (s x1) (s x2) h, enorm 0]
+
+    where " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " := (bigstep s h e s1 h1 r)
   .
 
   Module ProgramExamples.
 
     Example ex_ref :
-      bigstep
-      sempty hempty
-      (plet "x" (pconst 1) (pref "x"))
-      sempty
-      (hupdate 2 1 hempty)
-      (enorm 2).
+      eval[ sempty, hempty, plet "x" (pconst 1) (pref "x") ]=>[ sempty, hupdate 2 1 hempty, enorm 2 ].
     Proof.
       apply eval_plet with (v:=1) (s1:=sempty) (s2:=supdate "x" 1 sempty) (h1:=hempty).
       apply eval_pconst.
@@ -148,18 +145,22 @@ Definition postcond := Z -> assertion.
   | norm : Z -> result
   .
 
+  Reserved Notation " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " (at level 50, left associativity).
+
   (* axiomatization of semantics for staged formulae *)
   Inductive satisfies : bool -> store -> heap -> bool -> store -> heap -> result -> flow -> Prop :=
     | sem_req: forall h3 p s1 s2 h1 r,
       (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ p s1 h2) ->
-      satisfies true s1 h3 true s2 h1 (norm r) (req p)
+      sem[ true, s1, h3]=>[true, s2, h1, norm r] |= req p
     | sem_ens: forall h1 h3 q v s,
       (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ q v s h2) ->
-      satisfies true s h1 true s h3 (norm v) (ens q)
+      sem[ true, s, h1]=>[true, s, h3, norm v] |= ens q
     | sem_seq: forall f1 f2 r r1 h1 h2 h3 c s s1 s2,
-      satisfies true s h1 true s1 h2 r f1 ->
-      satisfies true s1 h2 c s2 h3 r1 f2 ->
-      satisfies true s h1 c s2 h3 r1 (f1;;f2)
+      sem[ true, s, h1]=>[true, s1, h2, r] |= f1 ->
+      sem[ true, s1, h2]=>[c, s2, h3, r1] |= f2 ->
+      sem[ true, s, h1]=>[c, s2, h3, r1] |= (f1;;f2)
+
+  where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f)
   .
 
     (* forward rules say how to produce a staged formula from a program *)
@@ -254,17 +255,18 @@ such that:
 
   Module SpecExamples.
     Example ex_spec_return_anything: exists x,
-      satisfies true hempty true hempty (norm x) (req emp).
+      sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm x] |= req emp.
     Proof.
       exists 1.
-      apply sem_req with (s := sempty).
+      apply sem_req with (s1 := sempty).
       auto.
       exists hempty.
       repeat split; heap.
     Qed.
 
     Example ex_spec_ens_1:
-      satisfies true hempty true hempty (norm 1) (ens (fun r => (r = 1) //\\ emp)).
+      sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm 1] |=
+        ens (fun r => (r = 1) //\\ emp).
     Proof.
       apply sem_ens with (s := sempty).
       exists hempty.
@@ -272,12 +274,11 @@ such that:
     Qed.
 
     Example ex_spec_seq: forall x,
-      satisfies true (hupdate x 1 hempty) true (hupdate x 1 hempty) (norm 2)
-      (req (contains x 1);; ens (fun r => (r = 2) //\\ contains x 1)).
+      sem[ true, sempty, hupdate x 1 hempty]=>[ true, sempty, hupdate x 1 hempty, norm 2] |= (req (contains x 1);; ens (fun r => (r = 2) //\\ contains x 1)).
     Proof.
       intros.
-      apply sem_seq with (h2 := hempty) (r := norm 3).
-      - apply sem_req with (s := sempty).
+      apply sem_seq with (s1 := sempty) (h2 := hempty) (r := norm 3).
+      - apply sem_req with (s1 := sempty).
       exists (hupdate x 1 hempty).
       repeat split.
       heap.
