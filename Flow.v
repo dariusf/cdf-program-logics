@@ -226,38 +226,51 @@ Definition postcond := Z -> assertion.
     Qed.
   End ForwardExamples.
 
+Definition compatible r1 r2 :=
+  match (r1, r2) with
+  | (norm r3, enorm r4) => r3 = r4
+  end.
+
 (* {ens emp} e {\phi}, 
 SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
 [S, h, e] -----> [S2, h2, R2], R2!=\bot, 
 such that: 
 \exists (check, s3, h3, R3) \in SH, s3 \subset s2, h3 \subset h2, R2=R1 *)
-    Theorem soundness : forall e f s1 s2 s3 h1 h2 h3 r1 r2,
-      bigstep s1 h1 e s3 h3 (enorm r2) ->
+    Theorem soundness :
+    forall s1 h1 e s3 h3 r2 (**) f s2 h2 r1,
+      bigstep s1 h1 e s3 h3 r2 ->
       forward e f ->
-      satisfies true s1 h1 true s2 h2 (norm r1) f ->
-      s2 = s3 /\ h2 = h3 /\ r1 = r2.
+      satisfies true s1 h1 true s2 h2 r1 f ->
+      s2 = s3 /\ h2 = h3 /\ compatible r1 r2
+        .
       (* forall f h3 r, *)
     Proof.
-      intros e f s1 s2 s3 h1 h2 h3 r1 r2 Hb.
+      intros e s1 s3 h1 h3 r2
+             f s2 h2 r1
+             Hb.
+      revert f s2 h2 r1.
       (* inv Hb. *)
       (* generalize dependent f.
       generalize dependent s2.
       generalize dependent h2.
       generalize dependent r1. *)
       (* https://stackoverflow.com/questions/4519692/keeping-information-when-using-induction *)
-      remember (enorm r2) as t1 in Hb.
-      induction Hb; intros Hf Hs.
+      (* remember (enorm r2) as t1 in Hb. *)
+      (* dependent induction Hb; *)
+      induction Hb;
+      intros f s4 h3 r1 Hf Hs.
       -
       (* var. proof comes down to the fact that both spec and program read s(x) and leave the heap unchanged.
       the use of r in ens[r] in the paper is not modelled due to HOAS representation of postconditions. *)
- injection Heqt1; intros.
+      (* not needed with dependent induction *)
+      (* injection Heqt1; intros. *)
  (* applyf_equal Heqt1. *)
       inv Hf.
       inv Hs.
-      destr H3.
+      destr H0.
       unfold emp in H4.
       (* subst. *)
-      rewrite H4 in H1.
+      rewrite H4 in H0.
       (* rewrite hunion_comm in H1. *)
       (* rewrite hunion_empty in H1. *)
       (* HUNION1 (3)%nat. *)
@@ -275,8 +288,17 @@ such that:
       (* exists hempty. *)
       - admit.
       -
-      subst r.
+      (* subst r. *)
       inv Hf.
+      (* apply IHHb1. *)
+      inv Hs.
+      destruct H5.
+      inv H.
+
+(* now the problem is replace_ret is not the same, which messes with the use of the induction hypothesis. maybe try not using inv, just plain inversion without subst? and defer checking the equality *)
+
+      (* pose proof (IHHb1 _ _ _ _ H2 H3). *)
+      pose proof (IHHb2 _ _ _ _ H4 H11).
 
       admit.
       - admit.
