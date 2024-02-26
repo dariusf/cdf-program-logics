@@ -136,10 +136,16 @@ Definition postcond := Z -> assertion.
   | req : precond -> flow
   | ens : postcond -> flow
   | seq : flow -> flow -> flow
-  | fexists : (Z -> flow) -> flow -> flow
+  (* | fexists : (Z -> flow) -> flow *)
+  | fexists : ident -> flow -> flow
   .
 
   Infix ";;" := seq (at level 80, right associativity).
+
+  (* Inductive subst_flow x v f :=
+    match f with
+    | req p => 
+    end. *)
 
   Inductive result : Type :=
   | norm : Z -> result
@@ -151,14 +157,18 @@ Definition postcond := Z -> assertion.
   Inductive satisfies : bool -> store -> heap -> bool -> store -> heap -> result -> flow -> Prop :=
     | sem_req: forall h3 p s1 s2 h1 r,
       (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ p s1 h2) ->
-      sem[ true, s1, h3]=>[true, s2, h1, norm r] |= req p
+      sem[true, s1, h3]=>[true, s2, h1, norm r] |= req p
     | sem_ens: forall h1 h3 q v s,
       (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ q v s h2) ->
-      sem[ true, s, h1]=>[true, s, h3, norm v] |= ens q
+      sem[true, s, h1]=>[true, s, h3, norm v] |= ens q
+    | sem_ex: forall s h1 h2 x e r,
+      (* the reason we can't use hoas is that the binding to the existential has to appear in the stack... *)
+      (exists v, sem[true, supdate x v s, h1]=>[true, s, h2, r] |= e) ->
+      sem[true, s, h1]=>[true, s, h2, r] |= fexists x e
     | sem_seq: forall f1 f2 r r1 h1 h2 h3 c s s1 s2,
-      sem[ true, s, h1]=>[true, s1, h2, r] |= f1 ->
-      sem[ true, s1, h2]=>[c, s2, h3, r1] |= f2 ->
-      sem[ true, s, h1]=>[c, s2, h3, r1] |= (f1;;f2)
+      sem[true, s, h1]=>[true, s1, h2, r] |= f1 ->
+      sem[true, s1, h2]=>[c, s2, h3, r1] |= f2 ->
+      sem[true, s, h1]=>[c, s2, h3, r1] |= (f1;;f2)
 
   where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f)
   .
@@ -172,12 +182,34 @@ Definition postcond := Z -> assertion.
       | fw_deref: forall x z,
         forward (pderef x) (req (ptsval x z);;
         ens (fun res => (res = z) //\\ ptsval x z))
+      | fw_ref: forall x y,
+        (* forward (pref x) (fexists (fun y => ens (fun r s h => contains y (s x) s h))) *)
+        forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h))))
+      | fw_let: forall x e1 e2 f1 f2,
+        forward e1 f1 ->
+        forward e2 f2 ->
+        forward (plet x e1 e2) (f1 ;; f2)
 
       (* | fw_get: forall l v, 
         forward (GET l)
           (req (contains l v) ;;
           (ens (fun r => (r = v) //\\ contains l v))) *)
     .
+
+  Module ForwardExamples.
+    Example ex_forward_let:
+    forward (plet "x" (pconst 1) (pref "x"))
+      (ens (fun r => pure (r = 1));;
+      (* ens (fun r s h => pure (r = s "x") s h)) *)
+      (fexists "y" (ens (fun r s h => (r = s "y") /\ (pts "y" "x" s h)))))
+      .
+    Proof.
+      apply fw_let.
+      apply fw_const.
+      apply fw_ref.
+    Qed.
+  End ForwardExamples.
+
 
 (* {ens emp} e {\phi}, 
 SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
@@ -199,13 +231,15 @@ such that:
       generalize dependent r1. *)
       (* https://stackoverflow.com/questions/4519692/keeping-information-when-using-induction *)
       remember (enorm r2) as t1 in Hb.
-      induction Hb; intros.
+      induction Hb; intros Hf Hs.
       -
+      (* var. proof comes down to the fact that both spec and program read s(x) and leave the heap unchanged.
+      the use of r in ens[r] in the paper is not modelled due to HOAS representation of postconditions. *)
  injection Heqt1; intros.
  (* applyf_equal Heqt1. *)
-      inv H.
-      inv H0.
-      destr H4.
+      inv Hf.
+      inv Hs.
+      destr H3.
       unfold emp in H4.
       (* subst. *)
       rewrite H4 in H1.
@@ -225,7 +259,11 @@ such that:
       (* apply sem_ens. *)
       (* exists hempty. *)
       - admit.
-      - admit.
+      -
+      subst r.
+      inv Hf.
+
+      admit.
       - admit.
       - admit.
       - admit.
@@ -251,7 +289,6 @@ such that:
      - admit.
      - admit.
     Admitted. *)
-
 
   Module SpecExamples.
     Example ex_spec_return_anything: exists x,
