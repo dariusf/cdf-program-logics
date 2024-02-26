@@ -142,10 +142,13 @@ Definition postcond := Z -> assertion.
 
   Infix ";;" := seq (at level 80, right associativity).
 
-  (* Inductive subst_flow x v f :=
+  Fixpoint replace_ret x f :=
     match f with
-    | req p => 
-    end. *)
+    | ens q => ens (fun r s h => ((r = s x) //\\ q (s x)) s h)
+    | req p => f
+    | seq a b => seq a (replace_ret x b)
+    | fexists i f => fexists i (replace_ret x f)
+    end.
 
   Inductive result : Type :=
   | norm : Z -> result
@@ -179,16 +182,19 @@ Definition postcond := Z -> assertion.
         forward (pconst n) (ens (fun res => (res = n) //\\ emp))
       | fw_var: forall x,
         forward (pvar x) (ens (fun res s h => res = s x /\ emp s h))
-      | fw_deref: forall x z,
-        forward (pderef x) (req (ptsval x z);;
-        ens (fun res => (res = z) //\\ ptsval x z))
+
+      | fw_deref: forall x y,
+        forward (pderef x) (fexists y (req (pts x y);;
+          ens (fun res s h => ((res = s y) //\\ pts x y) s h)))
+
       | fw_ref: forall x y,
         (* forward (pref x) (fexists (fun y => ens (fun r s h => contains y (s x) s h))) *)
         forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h))))
-      | fw_let: forall x e1 e2 f1 f2,
+      | fw_let: forall x e1 e2 f1 f2 f3,
         forward e1 f1 ->
         forward e2 f2 ->
-        forward (plet x e1 e2) (f1 ;; f2)
+        replace_ret "x" f1 = f3 ->
+        forward (plet x e1 e2) (fexists "x" (f3 ;; f2))
 
       (* | fw_get: forall l v, 
         forward (GET l)
@@ -198,18 +204,27 @@ Definition postcond := Z -> assertion.
 
   Module ForwardExamples.
     Example ex_forward_let:
-    forward (plet "x" (pconst 1) (pref "x"))
-      (ens (fun r => pure (r = 1));;
-      (* ens (fun r s h => pure (r = s "x") s h)) *)
-      (fexists "y" (ens (fun r s h => (r = s "y") /\ (pts "y" "x" s h)))))
+    forward (plet "x" (pconst 1) (pderef "x"))
+      (fexists "x" (ens (fun r s h => pure (r = s "x" /\ s "x" = 1) s h);;
+      (fexists "z" (req (pts "x" "z");;
+        ens (fun res s h => ((res = s "z") //\\ pts "x" "z") s h)))
+      ))
       .
     Proof.
-      apply fw_let.
+      apply fw_let with (f1 := (ens (fun r => pure (r = 1)))).
       apply fw_const.
-      apply fw_ref.
+      apply fw_deref.
+      simpl.
+      f_equal.
+      apply functional_extensionality; intros v.
+      apply functional_extensionality; intros s.
+      apply functional_extensionality; intros h.
+      unfold pureconj.
+      unfold pure.
+      apply propositional_extensionality.
+      intuition auto.
     Qed.
   End ForwardExamples.
-
 
 (* {ens emp} e {\phi}, 
 SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
