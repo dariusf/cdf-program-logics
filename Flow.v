@@ -164,9 +164,9 @@ Definition postcond := Z -> assertion.
     | sem_ens: forall h1 h3 q v s,
       (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ q v s h2) ->
       sem[true, s, h1]=>[true, s, h3, norm v] |= ens q
-    | sem_ex: forall s h1 h2 x e r,
+    | sem_ex: forall s s1 h1 h2 x e r,
       (* the reason we can't use hoas is that the binding to the existential has to appear in the stack... *)
-      (exists v, sem[true, supdate x v s, h1]=>[true, s, h2, r] |= e) ->
+      (exists v, sem[true, supdate x v s, h1]=>[true, s1, h2, r] |= e) ->
       sem[true, s, h1]=>[true, s, h2, r] |= fexists x e
     | sem_seq: forall f1 f2 r r1 h1 h2 h3 c s s1 s2,
       sem[true, s, h1]=>[true, s1, h2, r] |= f1 ->
@@ -180,6 +180,7 @@ Definition postcond := Z -> assertion.
     Inductive forward : expr -> flow -> Prop :=
       | fw_const: forall n,
         forward (pconst n) (ens (fun res => (res = n) //\\ emp))
+
       | fw_var: forall x,
         forward (pvar x) (ens (fun res s h => res = s x /\ emp s h))
 
@@ -190,6 +191,7 @@ Definition postcond := Z -> assertion.
       | fw_ref: forall x y,
         (* forward (pref x) (fexists (fun y => ens (fun r s h => contains y (s x) s h))) *)
         forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h))))
+
       | fw_let: forall x e1 e2 f1 f2 f3,
         forward e1 f1 ->
         forward e2 f2 ->
@@ -289,16 +291,26 @@ such that:
       - admit.
       -
       (* subst r. *)
-      inv Hf.
+      inversion Hf.
+      clear Hf.
+      subst f x0 e0 e3.
       (* apply IHHb1. *)
-      inv Hs.
-      destruct H5.
-      inv H.
+      inversion Hs.
+      clear Hs.
+      (* inv Hs. *)
+      (* destruct H6. *)
+      (* inv H6. *)
 
-(* now the problem is replace_ret is not the same, which messes with the use of the induction hypothesis. maybe try not using inv, just plain inversion without subst? and defer checking the equality *)
+      (* now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
 
-      (* pose proof (IHHb1 _ _ _ _ H2 H3). *)
-      pose proof (IHHb2 _ _ _ _ H4 H11).
+      (* the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
+
+(* https://xavierleroy.org/courses/EUTypes-2019/slides.pdf *)
+
+      (* define substore next *)
+
+      pose proof (IHHb1 _ _ _ _ H2 H6).
+      (* pose proof (IHHb2 _ _ _ _ H4 H11). *)
 
       admit.
       - admit.
