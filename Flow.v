@@ -60,18 +60,66 @@ Ltac heap := HUNION (3%nat); HDISJ; auto.
 (* Ltac rw := rewrite. *)
 (* Ltac con := constructor. *)
 
+(* https://github.com/tchajed/coq-tricks/blob/master/src/Deex.v *)
+(* Ltac deex :=
+  repeat match goal with
+         | [ H: exists (name:_), _ |- _ ] =>
+           let name' := fresh name in
+           destruct H as [name' H]
+         end. *)
+
 Ltac destr H :=
   match type of H with
   | ex _ =>
     let L := fresh in
     let R := fresh in
     destruct H as [L R]; destr R
+  (* | [ H: exists (name:_), _ |- _ ] =>
+    let name' := fresh name in
+    destruct H as [name' H] *)
   | _ /\ _ =>
     let L := fresh in
     let R := fresh in
     destruct H as [L R]; destr L; destr R
   | _ => idtac
   end.
+
+Module Biabduction.
+
+  (* like the member predicate *)
+  Inductive split : assertion -> assertion -> assertion -> Prop :=
+    | split_one : forall h2 x y,
+      split (pts x y ** h2) (pts x y) h2
+
+    | split_next : forall h2 x y h h1,
+      split h1 h h2 ->
+      split (pts x y ** h2) h h2
+  .
+
+  Inductive biab : assertion -> assertion -> assertion -> Prop :=
+
+    | biab_base : forall s m,
+      biab s m (pure True)
+
+    | biab_missing : forall x y a m,
+      biab emp ((pts x y) ** m) ((pts x y) ** a)
+
+    | biab_match : forall x y z a b m m1,
+      biab b m a ->
+      (z = y) //\\ m = m1 ->
+      biab ((pts x z) ** b) m1 ((pts x y) ** a)
+  .
+
+  Example ex1 : forall x y a b,
+    biab (pts x y ** emp) (pts a b) (pts x y ** pts a b).
+  Proof.
+    intros.
+    apply biab_match with (m := pts a b).
+    (* apply biab_missing with (m := pts a b). *)
+
+  Qed.
+
+End Biabduction.
 
 Module Flow3.
 
