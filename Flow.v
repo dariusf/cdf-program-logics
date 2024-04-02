@@ -151,7 +151,7 @@ Module Flow3.
     | eval_plet : forall x e1 e2 v s h h2 s2 s1 h1 r,
       eval[ s, h, e1 ] => [ s1, h1, enorm v] ->
       eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r] ->
-      eval[ s, h, plet x e1 e2 ] => [ s, h2, r ]
+      eval[ s, h, plet x e1 e2 ] => [ s2, h2, r ]
     (* | eval_pref : forall x s (h:heap) l,
       h l = None ->
       eval[ s, h, pref x ] => [ s, hupdate l (s x) h, enorm l]
@@ -479,12 +479,13 @@ such that:
       (* /\ he2 = hs2 *)
       /\ compatible rs re.
     Proof.
-      intros se1 he1 e se he re
+      intros se1 he1 e se2 he2 re
              f ss1 hs1 ss2 hs2 rs
              Hb.
       revert f ss1 hs1 ss2 hs2 rs.
       induction Hb;
-      intros f ss1 hs1 ss2 hs2 rs Hsub Hf Hs.
+      intros f ss1 hs1 ss2 hs2 rs;
+      intros Hsub Hf Hs.
       - (* var. the proof comes down to the fact that both spec and program read
            s(x) and leave the heap unchanged. *)
         inv Hf.
@@ -513,10 +514,18 @@ such that:
       (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
       (* easy. *)
       (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
-      pose proof (substore_extension).
-      specialize (IHHb1 f1 (supdate "x" H0 ss1) hs1 H6 H7 (norm H10)).
-
       assert (Hnotin: ss1 "x" = None). admit.
+      pose proof (substore_extension_trans s ss1 H0 "x" Hsub Hnotin) as Hha.
+      specialize (IHHb1 f1 (supdate "x" H0 ss1) hs1 H6 H7 (norm H10) Hha H2 H13).
+      destruct IHHb1 as [IH1 IH2].
+      (* we know that evaluation of e1 preserves substore *)
+
+      (* apply IHHb2. *)
+      (* assert (Hnotin1: H6 x = None). admit. *)
+      (* pose proof (substore_extension_trans s1 H6 v x IH1 Hnotin1) as Hha1. *)
+      specialize (IHHb2 f2 H6 H7 ss2 hs2 rs).
+      apply IHHb2; auto.
+
 
       (* now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
 
