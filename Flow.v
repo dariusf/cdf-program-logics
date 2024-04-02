@@ -86,7 +86,7 @@ Ltac destr H :=
 
 Module Biabduction.
 
-  (* like the member predicate *)
+  (* like the member predicate. or modulo equivalence? *)
   Inductive split : assertion -> assertion -> assertion -> Prop :=
     | split_one : forall h2 x y,
       split (pts x y ** h2) (pts x y) h2
@@ -117,7 +117,7 @@ Module Biabduction.
     apply biab_match with (m := pts a b).
     (* apply biab_missing with (m := pts a b). *)
 
-  Qed.
+  Admitted.
 
 End Biabduction.
 
