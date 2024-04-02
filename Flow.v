@@ -463,6 +463,63 @@ Definition compatible r1 r2 :=
   | (norm r3, enorm r4) => r3 = r4
   end.
 
+Definition wellformed (f:flow) c1 s1 h1 c2 s2 h2 r :=
+  f c1 s1 h1 c2 s2 h2 r -> substore s1 s2.
+
+Lemma replace_ret_wellformed : forall x f c1 s1 h1 c2 s2 h2 v,
+  Some v = s1 x ->
+  wellformed f c1 s1 h1 c2 s2 h2 (norm v) ->
+  (wellformed (replace_ret x f)) c1 s1 h1 c2 s2 h2 (norm v).
+Proof.
+  unfold wellformed.
+  intros.
+  unfold replace_ret in H1; destr H1.
+  apply H0.
+  congruence.
+Qed.
+
+(* we could prove _wellformed lemmas for all req, ens, etc., but currently we're doing it only for the structures generated from the forward rules *)
+
+Lemma forward_wellformed : forall e f c1 s1 h1 c2 s2 h2 r,
+  forward e f -> (wellformed f) c1 s1 h1 c2 s2 h2 r.
+Proof.
+  intros e f c1 s1 h1 c2 s2 h2 r H.
+  revert c1 s1 h1 c2 s2 h2 r.
+  induction H; intros.
+  - unfold wellformed; intros.
+    unfold ens in H; destr H; subst.
+    apply substore_refl.
+  -
+  unfold wellformed; intros.
+    unfold ens in H; destr H; subst.
+    apply substore_refl.
+  -
+    unfold wellformed; intros.
+    unfold fexists in H2; destr H2; subst.
+    unfold seq in H6; destr H6; subst.
+
+    pose proof (replace_ret_wellformed x f1 true (supdate x H4 s1) h1 true s2 h2 H4).
+    rewrite supdate_same in H8.
+    assert (Some H4 = Some H4). reflexivity.
+    specialize (H8 H10).
+    specialize (IHforward1 true (supdate x H4 s1) h1 true s2 h2 (norm H4)).
+    specialize (H8 IHforward1).
+    clear H10 IHforward1.
+    unfold wellformed in H8.
+
+(* replace_ret is only wellformed/only works if there is a result. however the let rule applies it unconditionally *)
+    (* specialize (H8 H7). *)
+
+    unfold wellformed in IHforward2.
+
+    (* apply IHforward2. *)
+    (* unfold replace_ret in H6. *)
+
+    (* unfold ens in H; destr H; subst. *)
+    (* apply substore_refl. *)
+    admit.
+Admitted.
+
 (* {ens emp} e {\phi}, 
 SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
 [S, h, e] -----> [S2, h2, R2], R2!=\bot, 
@@ -527,9 +584,6 @@ such that:
       (* we know that evaluation of e1 preserves substore *)
 
       (* now try to use IH2 *)
-      (* apply IHHb2. *)
-      (* assert (Hnotin1: H6 x = None). admit. *)
-      (* pose proof (substore_extension_trans s1 H6 v x IH1 Hnotin1) as Hha1. *)
       specialize (IHHb2 f2 H6 H7 ss2 hs2 rs).
       apply IHHb2; auto.
       apply (substore_extension_left s1 H6 v x IH1).
@@ -538,9 +592,9 @@ such that:
       rewrite H9.
       rewrite supdate_same in H9.
       rewrite supdate_same.
-      assert (Hpreserve : substore (supdate x H0 ss1) H6). admit.
       (* need to know substore (supdate x H0 ss1) H6 is preserved by all spec/f eval *)
       (* but how to know that, as we can give any f *)
+      assert (Hpreserve : substore (supdate x H0 ss1) H6). admit.
       unfold substore in Hpreserve.
       apply Hpreserve.
       rewrite supdate_same.
