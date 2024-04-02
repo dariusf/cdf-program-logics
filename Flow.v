@@ -425,8 +425,8 @@ End StagesDeep.
       | fw_let: forall x e1 e2 f1 f2 f3,
         forward e1 f1 ->
         forward e2 f2 ->
-        replace_ret "x" f1 = f3 ->
-        forward (plet x e1 e2) (fexists "x" (f3 ;; f2))
+        replace_ret x f1 = f3 ->
+        forward (plet x e1 e2) (fexists x (f3 ;; f2))
 
       (* | fw_get: forall l v, 
         forward (GET l)
@@ -514,9 +514,9 @@ such that:
       (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
       (* easy. *)
       (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
-      assert (Hnotin: ss1 "x" = None). admit.
-      pose proof (substore_extension_trans s ss1 H0 "x" Hsub Hnotin) as Hha.
-      specialize (IHHb1 f1 (supdate "x" H0 ss1) hs1 H6 H7 (norm H10) Hha H2 H13).
+      assert (Hnotin: ss1 x = None). admit.
+      pose proof (substore_extension_trans s ss1 H0 x Hsub Hnotin) as Hha.
+      specialize (IHHb1 f1 (supdate x H0 ss1) hs1 H6 H7 (norm H10) Hha H2 H13).
       destruct IHHb1 as [IH1 IH2].
       (* we know that evaluation of e1 preserves substore *)
 
