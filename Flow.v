@@ -490,47 +490,34 @@ Proof.
   - unfold wellformed; intros.
     unfold ens in H; destr H; subst.
     apply substore_refl.
-  -
-  unfold wellformed; intros.
+  - unfold wellformed; intros.
     unfold ens in H; destr H; subst.
     apply substore_refl.
   -
     unfold wellformed; intros.
-    unfold fexists in H2; destr H2; subst.
-    unfold seq in H6; destr H6; subst.
+    unfold fexists in H2; destruct H2 as [? [? [v ?]]]; subst.
+    unfold seq in H4. destruct H4 as [_ [_ [s3 [h3 [? [Hrr Hf2]]]]]]. subst.
 
     (* introduce well-formed lemma on replace_ret *)
-    pose proof (replace_ret_wellformed x f1 true (supdate x H4 s1) h1 true H2 H5 H4) as Hret.
-    (* pose proof (replace_ret_wellformed x f1 true (supdate x H4 s1) h1 true s2 h2 H4) as Hret. *)
+    pose proof (replace_ret_wellformed x f1 true (supdate x v s1) h1 true s3 h3 v) as Hret.
     rewrite supdate_same in Hret.
-    assert (Some H4 = Some H4). reflexivity.
-    specialize (Hret H8).
-    clear H8.
+    assert (Some v = Some v) as triv. reflexivity.
+    specialize (Hret triv); clear triv.
 
     (* assuming f1 is wf using the IH, replace_ret f1 is wf *)
-    specialize (IHforward1 true (supdate x H4 s1) h1 true H2 H5 (norm H4)).
+    specialize (IHforward1 true (supdate x v s1) h1 true s3 h3 (norm v)).
     specialize (Hret IHforward1).
-    (* clear IHforward1. *)
     unfold wellformed in Hret.
-    specialize (Hret H7).
+    specialize (Hret Hrr).
 
     unfold wellformed in IHforward2.
-    specialize (IHforward2 true H2 H5 true s2 h2 r H9).
+    specialize (IHforward2 true s3 h3 true s2 h2 r Hf2).
 
     unfold wellformed in IHforward1.
-    unfold replace_ret in H7; destr H7.
-    rewrite supdate_same in H7.
-    inj H7.
-    specialize (IHforward1 H11).
-    assert (substore s1 (supdate x H4 s1)).
+    unfold replace_ret in Hrr; destruct Hrr as [? [? Hf1]]; rewrite supdate_same in H1; inj H1.
+    specialize (IHforward1 Hf1).
+    assert (substore s1 (supdate x v s1)).
     apply substore_extension.
-
-
-    (* apply IHforward2. *)
-    (* unfold replace_ret in H6. *)
-
-    (* unfold ens in H; destr H; subst. *)
-    (* apply substore_refl. *)
     admit.
 Admitted.
 
@@ -576,10 +563,10 @@ such that:
       (* r is the final result *)
       inv Hf.
       (* the spec is of the form ex x. f1[x/r];f2 *)
-      unfold fexists in Hs; destr Hs.
+      unfold fexists in Hs; destruct Hs as [_ [_ [v1 Hseq]]].
       (* see how it evaluates *)
-      inv H5; destr H6.
-      unfold replace_ret in H9; destr H9.
+      unfold seq in Hseq; destruct Hseq as [_ [_ [s3 [h3 [? [Hrr ?]]]]]].
+      unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]].
 
 
       (* OLD NOW FIXED now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
@@ -592,23 +579,23 @@ such that:
       (* easy. *)
       (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
       assert (Hnotin: ss1 x = None). admit.
-      pose proof (substore_extension_trans s ss1 H0 x Hsub Hnotin) as Hha.
-      specialize (IHHb1 f1 (supdate x H0 ss1) hs1 H6 H7 (norm H10) Hha H2 H13).
+      pose proof (substore_extension_trans s ss1 v1 x Hsub Hnotin) as Hha.
+      specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s3 h3 (norm H10) Hha H2 H13).
       destruct IHHb1 as [IH1 IH2].
       (* we know that evaluation of e1 preserves substore *)
 
       (* now try to use IH2 *)
-      specialize (IHHb2 f2 H6 H7 ss2 hs2 rs).
+      specialize (IHHb2 f2 s3 h3 ss2 hs2 rs).
       apply IHHb2; auto.
-      apply (substore_extension_left s1 H6 v x IH1).
+      apply (substore_extension_left s1 s3 v x IH1).
       unfold compatible in IH2.
       rewrite <- IH2.
       rewrite H9.
       rewrite supdate_same in H9.
       rewrite supdate_same.
-      (* need to know substore (supdate x H0 ss1) H6 is preserved by all spec/f eval *)
+      (* need to know substore (supdate x v1 ss1) H6 is preserved by all spec/f eval *)
       (* but how to know that, as we can give any f *)
-      assert (Hpreserve : substore (supdate x H0 ss1) H6). admit.
+      assert (Hpreserve : substore (supdate x v1 ss1) s3). admit.
       unfold substore in Hpreserve.
       apply Hpreserve.
       rewrite supdate_same.
