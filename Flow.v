@@ -332,6 +332,7 @@ End StagesDeep.
   (* we can't use hoas for this as the existential binding has to appear in the stack *)
   Definition fexists : ident -> flow -> flow := fun i f c1 s1 h1 c2 s2 h2 r =>
     c1 = true /\ c2 = true /\
+    (* s1 i = None /\ *)
     exists v,
       f c1 (supdate i v s1) h1 c2 s2 h2 r.
 
@@ -498,19 +499,32 @@ Proof.
     unfold fexists in H2; destr H2; subst.
     unfold seq in H6; destr H6; subst.
 
-    pose proof (replace_ret_wellformed x f1 true (supdate x H4 s1) h1 true s2 h2 H4).
-    rewrite supdate_same in H8.
+    (* introduce well-formed lemma on replace_ret *)
+    pose proof (replace_ret_wellformed x f1 true (supdate x H4 s1) h1 true H2 H5 H4) as Hret.
+    (* pose proof (replace_ret_wellformed x f1 true (supdate x H4 s1) h1 true s2 h2 H4) as Hret. *)
+    rewrite supdate_same in Hret.
     assert (Some H4 = Some H4). reflexivity.
-    specialize (H8 H10).
-    specialize (IHforward1 true (supdate x H4 s1) h1 true s2 h2 (norm H4)).
-    specialize (H8 IHforward1).
-    clear H10 IHforward1.
-    unfold wellformed in H8.
+    specialize (Hret H8).
+    clear H8.
 
-(* replace_ret is only wellformed/only works if there is a result. however the let rule applies it unconditionally *)
-    (* specialize (H8 H7). *)
+    (* assuming f1 is wf using the IH, replace_ret f1 is wf *)
+    specialize (IHforward1 true (supdate x H4 s1) h1 true H2 H5 (norm H4)).
+    specialize (Hret IHforward1).
+    (* clear IHforward1. *)
+    unfold wellformed in Hret.
+    specialize (Hret H7).
 
     unfold wellformed in IHforward2.
+    specialize (IHforward2 true H2 H5 true s2 h2 r H9).
+
+    unfold wellformed in IHforward1.
+    unfold replace_ret in H7; destr H7.
+    rewrite supdate_same in H7.
+    inj H7.
+    specialize (IHforward1 H11).
+    assert (substore s1 (supdate x H4 s1)).
+    apply substore_extension.
+
 
     (* apply IHforward2. *)
     (* unfold replace_ret in H6. *)
