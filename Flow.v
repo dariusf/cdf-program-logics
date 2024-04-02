@@ -179,6 +179,9 @@ Module Flow3.
 Definition precond := assertion.
 Definition postcond := Z -> assertion.
 
+
+Module StagesDeep.
+
   Inductive stages : Type :=
     | req : precond -> stages
     | ens : postcond -> stages
@@ -262,7 +265,7 @@ Definition postcond := Z -> assertion.
       intuition auto.
     Qed.
 
-    Example ex_sem_f3:
+    (* Example ex_sem_f3:
       sem[true, (supdate "x" 2 sempty), (hupdate 2 3 hempty) ]=>[
         true, (supdate "x" 2 sempty), (hupdate 2 1 hempty), norm(1)] |= f3.
     Proof.
@@ -288,10 +291,123 @@ Definition postcond := Z -> assertion.
       apply sem_ens.
       admit.
       - auto.
-    Admitted.
+    Admitted. *)
     (* Qed. *)
 
   End SemanticsExamples.
+
+End StagesDeep.
+
+Module StagesShallow.
+
+  Inductive result : Type :=
+    | norm : Z -> result.
+
+  Definition flow := bool -> store -> heap -> bool -> store -> heap -> result -> Prop.
+
+  Definition req : precond -> flow := fun p c1 s1 h1 c2 s2 h2 r =>
+    c1 = true /\ c2 = true /\
+    (* h3 is the piece taken out satisfying p *)
+    exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p s1 h3.
+    (* TODO only true case for now *)
+
+  Definition ens : postcond -> flow := fun q c1 s1 h1 c2 s2 h2 r =>
+    c1 = true /\ c2 = true /\
+    forall v, r = norm v ->
+    (* h3 is the piece satisfying q that is addded to h1 *)
+      exists h3, h2 = hunion h1 h3 /\ hdisjoint h1 h3 /\ q v s1 h3.
+
+  Definition seq : flow -> flow -> flow := fun f1 f2 c1 s1 h1 c2 s2 h2 r =>
+    c1 = true /\ c2 = true /\
+    exists s3 h3 r1,
+    f1 c1 s1 h1 true s3 h3 r1 /\
+    f2 true s3 h3 c2 s2 h2 r.
+
+  Infix ";;" := seq (at level 80, right associativity).
+
+  (* we can't use hoas for this as the existential binding has to appear in the stack *)
+  Definition fex : ident -> flow -> flow := fun i f c1 s1 h1 c2 s2 h2 r =>
+    c1 = true /\ c2 = true /\
+    exists v,
+      f c1 (supdate i v s1) h1 c2 s2 h2 r.
+
+  Module SemanticsExamples.
+
+    Definition f1 : flow := ens (fun r => pure (r=1)).
+    Definition f2 : flow := req (fun s h => s "x" = 1).
+
+    (* ex z; req x->z; ens[r] x->1/\r=1 *)
+    Definition f3 : flow :=
+      fex "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
+
+    Example ex_sem_f1:
+      f1 true sempty hempty true sempty hempty (norm 1).
+      (* sem[true, sempty, hempty]=>[true, sempty, hempty, norm(1)] |= f1. *)
+    Proof.
+      unfold f1.
+      unfold ens.
+      intuition auto.
+      exists hempty.
+      heap.
+      inj H.
+      unfold pure.
+      intuition auto.
+    Qed.
+
+    Lemma supdate_same: forall l v h, (supdate l v h) l = v.
+    Proof.
+      intros; cbn.
+      unfold supdate.
+      destruct (string_dec l l); congruence.
+    Qed.
+
+    Lemma supdate_other: forall l v h l', l <> l' -> (supdate l v h) l' = h l'.
+    Proof.
+      intros; cbn.
+      unfold supdate.
+      destruct (string_dec l l'); congruence.
+    Qed.
+
+    Example ex_sem_f3:
+      f3 true (supdate "x" 2 sempty) (hupdate 2 3 hempty) 
+        true (supdate "x" 2 sempty) (hupdate 2 1 hempty) (norm 1).
+    Proof.
+      unfold f3.
+      unfold fex.
+      intuition auto.
+      exists 3. (* let z be 3 *)
+      unfold seq.
+      intuition auto.
+      exists (supdate "x" 2 sempty).
+      exists hempty.
+      exists (norm 4). (* can be anything *)
+      split.
+      - unfold req.
+        intuition auto.
+        exists (hupdate 2 3 hempty).
+        heap.
+        unfold pts.
+        unfold contains.
+        rewrite supdate_other; try congruence.
+        rewrite supdate_same.
+        rewrite supdate_same.
+        reflexivity.
+      - unfold ens.
+        intuition auto.
+        exists (hupdate 2 1 hempty).
+        heap.
+        inj H.
+        unfold pureconj.
+        intuition auto.
+        unfold ptsval.
+        unfold contains.
+        rewrite supdate_same.
+        reflexivity.
+    Qed.
+
+  End SemanticsExamples.
+
+End StagesShallow.
 
     (* forward rules say how to produce a staged formula from a program *)
     Inductive forward : expr -> flow -> Prop :=
