@@ -298,7 +298,7 @@ Module StagesDeep.
 
 End StagesDeep.
 
-Module StagesShallow.
+(* Module StagesShallow. *)
 
   Inductive result : Type :=
     | norm : Z -> result.
@@ -326,10 +326,13 @@ Module StagesShallow.
   Infix ";;" := seq (at level 80, right associativity).
 
   (* we can't use hoas for this as the existential binding has to appear in the stack *)
-  Definition fex : ident -> flow -> flow := fun i f c1 s1 h1 c2 s2 h2 r =>
+  Definition fexists : ident -> flow -> flow := fun i f c1 s1 h1 c2 s2 h2 r =>
     c1 = true /\ c2 = true /\
     exists v,
       f c1 (supdate i v s1) h1 c2 s2 h2 r.
+
+  Definition replace_ret (x:ident) (f:flow) : flow := fun c1 s1 h1 c2 s2 h2 r =>
+    f c1 s1 h1 c2 s2 h2 (norm (s1 x)).
 
   Module SemanticsExamples.
 
@@ -338,7 +341,7 @@ Module StagesShallow.
 
     (* ex z; req x->z; ens[r] x->1/\r=1 *)
     Definition f3 : flow :=
-      fex "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
+      fexists "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
 
     Example ex_sem_f1:
       f1 true sempty hempty true sempty hempty (norm 1).
@@ -373,7 +376,7 @@ Module StagesShallow.
         true (supdate "x" 2 sempty) (hupdate 2 1 hempty) (norm 1).
     Proof.
       unfold f3.
-      unfold fex.
+      unfold fexists.
       intuition auto.
       exists 3. (* let z be 3 *)
       unfold seq.
@@ -407,7 +410,7 @@ Module StagesShallow.
 
   End SemanticsExamples.
 
-End StagesShallow.
+(* End StagesShallow. *)
 
     (* forward rules say how to produce a staged formula from a program *)
     Inductive forward : expr -> flow -> Prop :=
@@ -438,27 +441,54 @@ End StagesShallow.
     .
 
   Module ForwardExamples.
-    Example ex_forward_let:
-    forward (plet "x" (pconst 1) (pderef "x"))
-      (fexists "x" (ens (fun r s h => pure (r = s "x" /\ s "x" = 1) s h);;
-      (fexists "z" (req (pts "x" "z");;
-        ens (fun res s h => ((res = s "z") //\\ pts "x" "z") s h)))
-      ))
-      .
+
+    (* let x = 1 in x *)
+    Example ex_forward_let1:
+      exists st, forward (plet "x" (pconst 1) (pvar "x")) st.
     Proof.
-      apply fw_let with (f1 := (ens (fun r => pure (r = 1)))).
-      apply fw_const.
-      apply fw_deref.
-      simpl.
-      f_equal.
-      apply functional_extensionality; intros v.
-      apply functional_extensionality; intros s.
-      apply functional_extensionality; intros h.
-      unfold pureconj.
-      unfold pure.
-      apply propositional_extensionality.
-      intuition auto.
+      eexists.
+      eapply fw_let.
+      eapply fw_const.
+      eapply fw_var.
+      cbn.
+      reflexivity.
     Qed.
+
+    Check ex_intro.
+    (* ex_intro : forall (A : Type) (P : A -> Prop) (x : A), P x -> exists y, P y *)
+    Print ex_forward_let1.
+
+    Definition t : exists st : flow, forward (plet "x" (pconst 1) (pvar "x")) st :=
+      ex_intro
+      (* this is P *)
+      (fun st : flow => forward (plet "x" (pconst 1) (pvar "x")) st)
+      (* this is the witness x, which is what we are after *)
+      (fexists "x"
+      (seq (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp)))
+      (ens
+      (fun (res : Z) (s : store) (h : heap) => and (eq res (s "x")) (emp s h)))))
+      (* this is the existential stmt P x, which is a derivation using the rules above, whose type includes the witness, as shown below *)
+      (fw_let "x" (pconst 1) (pvar "x") (ens (fun res : Z => pureconj (eq res 1) emp))
+      (ens (fun (res : Z) (s : store) (h : heap) => and (eq res (s "x")) (emp s h)))
+      (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))) (fw_const 1)
+      (fw_var "x")
+      (eq_refl : eq (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp)))
+      (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))))).
+
+     Definition t1 :
+      forward (plet "x" (pconst 1) (pvar "x"))
+        (fexists "x"
+          (replace_ret "x" (ens (fun res : Z => (res = 1) //\\ emp));;
+            ens (fun (res : Z) (s : store) (h : heap) => res = s "x" /\ emp s h)))
+            :=
+            (fw_let "x" (pconst 1) (pvar "x") (ens (fun res : Z => pureconj (eq res 1) emp))
+        (ens (fun (res : Z) (s : store) (h : heap) => and (eq res (s "x")) (emp s h)))
+        (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))) (fw_const 1)
+        (fw_var "x")
+        (eq_refl :
+      eq (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp)))
+        (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))))).
+
   End ForwardExamples.
 
 Definition compatible r1 r2 :=
