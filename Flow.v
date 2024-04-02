@@ -12,7 +12,7 @@ Local Open Scope list_scope.
 
 (* Tactic Notation "inv" constr(h) := inversion h; subst. *)
 Tactic Notation "inj" constr(h) := injection h as h; subst.
-Tactic Notation "ok" := auto; try easy.
+Tactic Notation "ok" := intuition auto; try easy.
 
 (* these could be made less powerful in future, so they can't be used wrongly *)
 Tactic Notation "vacuous" := easy.
@@ -129,9 +129,9 @@ Module Flow3.
     | pvar (x: ident)
     | pconst (n: val)
     | plet (x: ident) (e1: expr) (e2: expr)
-    | pref (x: ident)
-    | pderef (x: ident)
-    | passign (x1: ident) (x2: ident)
+    (* | pref (x: ident) *)
+    (* | pderef (x: ident) *)
+    (* | passign (x1: ident) (x2: ident) *)
     | pif (x: ident) (e1: expr) (e2: expr)
     | pcall (x: ident) (a: ident)
     .
@@ -151,28 +151,28 @@ Module Flow3.
       eval[ s, h, e1 ] => [ s1, h1, enorm v] ->
       eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r] ->
       eval[ s, h, plet x e1 e2 ] => [ s, h2, r ]
-    | eval_pref : forall x s (h:heap) l,
+    (* | eval_pref : forall x s (h:heap) l,
       h l = None ->
       eval[ s, h, pref x ] => [ s, hupdate l (s x) h, enorm l]
     | eval_deref : forall x s (h:heap) v,
       h (s x) = Some v ->
       eval[ s, h, pderef x ] => [ s, h, enorm v]
     | eval_assign : forall x1 x2 s h,
-      eval[ s, h, passign x1 x2 ] => [ s, hupdate (s x1) (s x2) h, enorm 0]
+      eval[ s, h, passign x1 x2 ] => [ s, hupdate (s x1) (s x2) h, enorm 0] *)
 
     where " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " := (bigstep s h e s1 h1 r)
   .
 
   Module ProgramExamples.
 
-    Example ex_ref :
+    (* Example ex_ref :
       eval[ sempty, hempty, plet "x" (pconst 1) (pref "x") ]=>[ sempty, hupdate 2 1 hempty, enorm 2 ].
     Proof.
       apply eval_plet with (v:=1) (s1:=sempty) (s2:=supdate "x" 1 sempty) (h1:=hempty).
       apply eval_pconst.
       apply eval_pref.
       constructor.
-    Qed.
+    Qed. *)
 
   End ProgramExamples.
 
@@ -307,13 +307,16 @@ End StagesDeep.
 
   Definition req : precond -> flow := fun p c1 s1 h1 c2 s2 h2 r =>
     c1 = true /\ c2 = true /\
+    s1 = s2 /\
     (* h3 is the piece taken out satisfying p *)
     exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p s1 h3.
     (* TODO only true case for now *)
 
   Definition ens : postcond -> flow := fun q c1 s1 h1 c2 s2 h2 r =>
     c1 = true /\ c2 = true /\
-    forall v, r = norm v ->
+    s1 = s2 /\
+    (* forall v, r = norm v -> *)
+    exists v, r = norm v /\
     (* h3 is the piece satisfying q that is addded to h1 *)
       exists h3, h2 = hunion h1 h3 /\ hdisjoint h1 h3 /\ q v s1 h3.
 
@@ -350,9 +353,10 @@ End StagesDeep.
       unfold f1.
       unfold ens.
       intuition auto.
+      exists 1.
+      intuition.
       exists hempty.
       heap.
-      inj H.
       unfold pure.
       intuition auto.
     Qed.
@@ -373,17 +377,17 @@ End StagesDeep.
 
     Example ex_sem_f3:
       f3 true (supdate "x" 2 sempty) (hupdate 2 3 hempty) 
-        true (supdate "x" 2 sempty) (hupdate 2 1 hempty) (norm 1).
+        true (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1).
     Proof.
       unfold f3.
       unfold fexists.
       intuition auto.
-      exists 3. (* let z be 3 *)
+      exists 3. (* the initial value of z in ex z. x->z, which is given *)
       unfold seq.
       intuition auto.
-      exists (supdate "x" 2 sempty).
+      exists (supdate "z" 3 (supdate "x" 2 sempty)).
       exists hempty.
-      exists (norm 4). (* can be anything *)
+      exists (norm 5). (* ret of req, can be anything *)
       split.
       - unfold req.
         intuition auto.
@@ -397,13 +401,15 @@ End StagesDeep.
         reflexivity.
       - unfold ens.
         intuition auto.
+        exists 1.
+        intuition auto.
         exists (hupdate 2 1 hempty).
         heap.
-        inj H.
         unfold pureconj.
         intuition auto.
         unfold ptsval.
         unfold contains.
+        rewrite supdate_other; try congruence.
         rewrite supdate_same.
         reflexivity.
     Qed.
@@ -420,13 +426,13 @@ End StagesDeep.
       | fw_var: forall x,
         forward (pvar x) (ens (fun res s h => res = s x /\ emp s h))
 
-      | fw_deref: forall x y,
+      (* | fw_deref: forall x y,
         forward (pderef x) (fexists y (req (pts x y);;
           ens (fun res s h => ((res = s y) //\\ pts x y) s h)))
 
       | fw_ref: forall x y,
         (* forward (pref x) (fexists (fun y => ens (fun r s h => contains y (s x) s h))) *)
-        forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h))))
+        forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h)))) *)
 
       | fw_let: forall x e1 e2 f1 f2 f3,
         forward e1 f1 ->
@@ -502,67 +508,44 @@ SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }
 such that: 
 \exists (check, s3, h3, R3) \in SH, s3 \subset s2, h3 \subset h2, R2=R1 *)
     Theorem soundness :
-    forall s1 h1 e s3 h3 r2 (**) f s2 h2 r1,
-      bigstep s1 h1 e s3 h3 r2 ->
+    forall s1 h1 e se he re (**) f ss hs rs,
+      bigstep s1 h1 e se he re ->
       forward e f ->
-      satisfies true s1 h1 true s2 h2 r1 f ->
-      s2 = s3 /\ h2 = h3 /\ compatible r1 r2
-        .
-      (* forall f h3 r, *)
+      f true s1 h1 true ss hs rs ->
+      (* TODO sub-stack *)
+      (* ss = se /\ *)
+      hs = he /\ compatible rs re.
     Proof.
-      intros e s1 s3 h1 h3 r2
-             f s2 h2 r1
+      intros s1 h1 e se he re
+             f ss hs rs
              Hb.
-      revert f s2 h2 r1.
-      (* inv Hb. *)
-      (* generalize dependent f.
-      generalize dependent s2.
-      generalize dependent h2.
-      generalize dependent r1. *)
-      (* https://stackoverflow.com/questions/4519692/keeping-information-when-using-induction *)
-      (* remember (enorm r2) as t1 in Hb. *)
-      (* dependent induction Hb; *)
+      revert f ss hs rs.
       induction Hb;
-      intros f s4 h3 r1 Hf Hs.
-      -
-      (* var. proof comes down to the fact that both spec and program read s(x) and leave the heap unchanged.
-      the use of r in ens[r] in the paper is not modelled due to HOAS representation of postconditions. *)
-      (* not needed with dependent induction *)
-      (* injection Heqt1; intros. *)
- (* applyf_equal Heqt1. *)
-      inv Hf.
-      inv Hs.
-      destr H0.
-      unfold emp in H4.
-      (* subst. *)
-      rewrite H4 in H0.
-      (* rewrite hunion_comm in H1. *)
-      (* rewrite hunion_empty in H1. *)
-      (* HUNION1 (3)%nat. *)
-      heap.
-      (* heap. *)
-      (* heap. *)
-      (* auto. *)
-      (* rewrite hunion_empty in H1; *)
-      (* heap. *)
-      (* intuition heap. *)
-      (* HDISJ. *)
-
-      (* intuition heap. *)
-      (* apply sem_ens. *)
-      (* exists hempty. *)
+      intros f ss hs rs Hf Hs.
+      - (* var. the proof comes down to the fact that both spec and program read
+           s(x) and leave the heap unchanged. *)
+        inv Hf.
+        unfold ens in Hs; destr Hs.
+        unfold emp in H9.
+        rewrite H9 in H5.
+        rewrite hunion_comm in H5; heap.
+        unfold compatible.
+        rewrite H3.
+        ok.
       - admit.
       -
-      (* subst r. *)
-      inversion Hf.
-      clear Hf.
-      subst f x0 e0 e3.
-      (* apply IHHb1. *)
-      inversion Hs.
-      clear Hs.
-      (* inv Hs. *)
-      (* destruct H6. *)
-      (* inv H6. *)
+      (* have an IH for each subexpr *)
+      (* v is the intermediate result of evaluating e1 *)
+      (* r is the final result *)
+      inv Hf.
+      (* the spec is of the form ex x. f1[x/r];f2 *)
+      unfold fexists in Hs; destr Hs.
+      (* see how it evaluates *)
+      inv H5; destr H6.
+      unfold replace_ret in H9.
+      apply IHHb2 with (f:=f2) (ss:=s2).
+      easy.
+      specialize (IHHb1 f1 (supdate x v s1) h1 (norm v) H2).
 
       (* now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
 
@@ -572,35 +555,7 @@ such that:
 
       (* define substore next *)
 
-      pose proof (IHHb1 _ _ _ _ H2 H6).
-      (* pose proof (IHHb2 _ _ _ _ H4 H11). *)
-
-      admit.
-      - admit.
-      - admit.
-      - admit.
     Admitted.
-
-    (* Theorem soundness : forall s1 h e1 s2 h1 h2,
-      bigstep s1 h e1 s2 h1 h2 ->
-      forall f h3 r,
-      forward e1 f ->
-      satisfies true s1 h1 true s2 h3 (norm r) f.
-    Proof.
-     intros s h e1 s1 h1 h2 Hb.
-     induction Hb; intros.
-     - inv H.
-     apply sem_ens.
-     exists hempty.
-      admit.
-      admit.
-      admit.
-     - admit.
-     - admit.
-     - admit.
-     - admit.
-     - admit.
-    Admitted. *)
 
   Module SpecExamples.
     Example ex_spec_return_anything: exists x,
