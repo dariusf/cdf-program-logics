@@ -76,3 +76,22 @@ Proof.
   apply substore_extension; easy.
   apply substore_trans with (s2 := s2); easy.
 Qed.
+
+Lemma substore_extension_left : forall s1 s2 v x,
+  substore s1 s2 ->
+  s2 x = Some v ->
+  substore (supdate x v s1) s2.
+Proof.
+  unfold substore; intros.
+  unfold supdate in H1.
+  destruct (string_dec x x0).
+  - 
+  (* if x is in s1, then updating it must have no effect *)
+  rewrite H1 in H0.
+  rewrite e in H0.
+  assumption.
+  - 
+  (* if x is not in s1, then updating it grows s1, but the result is no larger than s2 *)
+  apply H.
+  assumption.
+Qed.

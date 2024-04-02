@@ -509,6 +509,12 @@ such that:
       (* see how it evaluates *)
       inv H5; destr H6.
       unfold replace_ret in H9; destr H9.
+
+
+      (* OLD NOW FIXED now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
+
+      (* OLD NOW FIXED the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
+
       (* try to meet in the middle *)
       (* apply IHHb2. *)
       (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
@@ -520,16 +526,25 @@ such that:
       destruct IHHb1 as [IH1 IH2].
       (* we know that evaluation of e1 preserves substore *)
 
+      (* now try to use IH2 *)
       (* apply IHHb2. *)
       (* assert (Hnotin1: H6 x = None). admit. *)
       (* pose proof (substore_extension_trans s1 H6 v x IH1 Hnotin1) as Hha1. *)
       specialize (IHHb2 f2 H6 H7 ss2 hs2 rs).
       apply IHHb2; auto.
-
-
-      (* now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
-
-      (* the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
+      apply (substore_extension_left s1 H6 v x IH1).
+      unfold compatible in IH2.
+      rewrite <- IH2.
+      rewrite H9.
+      rewrite supdate_same in H9.
+      rewrite supdate_same.
+      assert (Hpreserve : substore (supdate x H0 ss1) H6). admit.
+      (* need to know substore (supdate x H0 ss1) H6 is preserved by all spec/f eval *)
+      (* but how to know that, as we can give any f *)
+      unfold substore in Hpreserve.
+      apply Hpreserve.
+      rewrite supdate_same.
+      reflexivity.
 
 (* https://xavierleroy.org/courses/EUTypes-2019/slides.pdf *)
 
