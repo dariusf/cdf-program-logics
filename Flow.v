@@ -143,8 +143,9 @@ Module Flow3.
   Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
   Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
-    | eval_pvar : forall s h x,
-      eval[ s, h, pvar x ]=>[ s, h, enorm (s x)]
+    | eval_pvar : forall s h x v,
+      Some v = s x ->
+      eval[ s, h, pvar x ]=>[ s, h, enorm v]
     | eval_pconst : forall s h x,
       eval[ s, h, pconst x ] => [ s, h, enorm x]
     | eval_plet : forall x e1 e2 v s h h2 s2 s1 h1 r,
@@ -236,7 +237,7 @@ Module StagesDeep.
   Module SemanticsExamples.
 
     Definition f1 : flow := fun r => ens (fun r1 => pure (r1=1 /\ r=r1)).
-    Definition f2 : flow := fun (r:Z) => req (fun s h => s "x" = 1).
+    Definition f2 : flow := fun (r:Z) => req (fun s h => s "x" = Some 1).
 
     (* ex z; req x->z; ens[r] x->1/\r=1 *)
     Definition f3 : flow := fun r =>
@@ -335,12 +336,13 @@ End StagesDeep.
       f c1 (supdate i v s1) h1 c2 s2 h2 r.
 
   Definition replace_ret (x:ident) (f:flow) : flow := fun c1 s1 h1 c2 s2 h2 r =>
-    f c1 s1 h1 c2 s2 h2 (norm (s1 x)).
+    exists v, Some v = s1 x /\
+    f c1 s1 h1 c2 s2 h2 (norm v).
 
   Module SemanticsExamples.
 
     Definition f1 : flow := ens (fun r => pure (r=1)).
-    Definition f2 : flow := req (fun s h => s "x" = 1).
+    Definition f2 : flow := req (fun s h => s "x" = Some 1).
 
     (* ex z; req x->z; ens[r] x->1/\r=1 *)
     Definition f3 : flow :=
@@ -359,20 +361,6 @@ End StagesDeep.
       heap.
       unfold pure.
       intuition auto.
-    Qed.
-
-    Lemma supdate_same: forall l v h, (supdate l v h) l = v.
-    Proof.
-      intros; cbn.
-      unfold supdate.
-      destruct (string_dec l l); congruence.
-    Qed.
-
-    Lemma supdate_other: forall l v h l', l <> l' -> (supdate l v h) l' = h l'.
-    Proof.
-      intros; cbn.
-      unfold supdate.
-      destruct (string_dec l l'); congruence.
     Qed.
 
     Example ex_sem_f3:
@@ -398,7 +386,7 @@ End StagesDeep.
         rewrite supdate_other; try congruence.
         rewrite supdate_same.
         rewrite supdate_same.
-        reflexivity.
+        eauto.
       - unfold ens.
         intuition auto.
         exists 1.
@@ -411,7 +399,7 @@ End StagesDeep.
         unfold contains.
         rewrite supdate_other; try congruence.
         rewrite supdate_same.
-        reflexivity.
+        eauto.
     Qed.
 
   End SemanticsExamples.
@@ -423,8 +411,8 @@ End StagesDeep.
       | fw_const: forall n,
         forward (pconst n) (ens (fun res => (res = n) //\\ emp))
 
-      | fw_var: forall x,
-        forward (pvar x) (ens (fun res s h => res = s x /\ emp s h))
+      | fw_var: forall x v,
+        forward (pvar x) (ens (fun res s h => s x = Some v /\ res = v /\ emp s h))
 
       (* | fw_deref: forall x y,
         forward (pderef x) (fexists y (req (pts x y);;
@@ -456,44 +444,17 @@ End StagesDeep.
       eapply fw_let.
       eapply fw_const.
       eapply fw_var.
-      cbn.
-      reflexivity.
+      eauto.
+      Unshelve.
+      exact 3. (* anything is allowed it seems *)
     Qed.
 
     Check ex_intro.
     (* ex_intro : forall (A : Type) (P : A -> Prop) (x : A), P x -> exists y, P y *)
     Print ex_forward_let1.
-
-    Definition t : exists st : flow, forward (plet "x" (pconst 1) (pvar "x")) st :=
-      ex_intro
-      (* this is P *)
-      (fun st : flow => forward (plet "x" (pconst 1) (pvar "x")) st)
-      (* this is the witness x, which is what we are after *)
-      (fexists "x"
-      (seq (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp)))
-      (ens
-      (fun (res : Z) (s : store) (h : heap) => and (eq res (s "x")) (emp s h)))))
-      (* this is the existential stmt P x, which is a derivation using the rules above, whose type includes the witness, as shown below *)
-      (fw_let "x" (pconst 1) (pvar "x") (ens (fun res : Z => pureconj (eq res 1) emp))
-      (ens (fun (res : Z) (s : store) (h : heap) => and (eq res (s "x")) (emp s h)))
-      (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))) (fw_const 1)
-      (fw_var "x")
-      (eq_refl : eq (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp)))
-      (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))))).
-
-     Definition t1 :
-      forward (plet "x" (pconst 1) (pvar "x"))
-        (fexists "x"
-          (replace_ret "x" (ens (fun res : Z => (res = 1) //\\ emp));;
-            ens (fun (res : Z) (s : store) (h : heap) => res = s "x" /\ emp s h)))
-            :=
-            (fw_let "x" (pconst 1) (pvar "x") (ens (fun res : Z => pureconj (eq res 1) emp))
-        (ens (fun (res : Z) (s : store) (h : heap) => and (eq res (s "x")) (emp s h)))
-        (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))) (fw_const 1)
-        (fw_var "x")
-        (eq_refl :
-      eq (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp)))
-        (replace_ret "x" (ens (fun res : Z => pureconj (eq res 1) emp))))).
+      (* (fun st : ...) is P *)
+      (* (fexists "x" ...) is the witness x, which is what we are after *)
+      (* (fw_let "x" ...) is the existential stmt P x, which is a derivation using the rules above, whose type includes the witness *)
 
   End ForwardExamples.
 
@@ -526,15 +487,15 @@ such that:
            s(x) and leave the heap unchanged. *)
         inv Hf.
         unfold ens in Hs; destr Hs.
-        unfold emp in H9.
-        rewrite H9 in H5.
-        rewrite hunion_comm in H5; heap.
+        subst.
+        unfold emp in H11.
+        rewrite H11.
         unfold compatible.
-        rewrite H3.
-        ok.
+        heap.
+        congruence.
       - admit.
       -
-      (* have an IH for each subexpr *)
+      (* we have an IH for each subexpr *)
       (* v is the intermediate result of evaluating e1 *)
       (* r is the final result *)
       inv Hf.
@@ -543,6 +504,7 @@ such that:
       (* see how it evaluates *)
       inv H5; destr H6.
       unfold replace_ret in H9.
+      (* try to meet in the middle *)
       apply IHHb2 with (f:=f2) (ss:=s2).
       easy.
       specialize (IHHb1 f1 (supdate x v s1) h1 (norm v) H2).
@@ -552,8 +514,6 @@ such that:
       (* the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
 
 (* https://xavierleroy.org/courses/EUTypes-2019/slides.pdf *)
-
-      (* define substore next *)
 
     Admitted.
 

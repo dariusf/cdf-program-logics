@@ -265,10 +265,14 @@ Definition contains (l: addr) (v: Z) : assertion :=
   fun s h => h = hupdate l v hempty.
 
 Definition pts (x: ident) (y: ident) : assertion :=
-  fun s h => contains (s x) (s y) s h.
+  fun s h =>
+    exists v w, Some v = s x /\ Some w = s y /\
+      contains v w s h.
 
 Definition ptsval (x: ident) (v: Z) : assertion :=
-  fun s h => contains (s x) v s h.
+  fun s h =>
+    exists w, Some w = s x /\
+      contains w v s h.
 
 (** The assertion "address [l] is valid" (i.e. in the domain of the heap). *)
 
