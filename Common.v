@@ -27,3 +27,52 @@ Qed.
 (* s1 <= s2 *)
 Definition substore (s1 s2 : store) :=
   forall v x, s1 x = Some v -> s2 x = Some v.
+
+Lemma substore_notin : forall (s:store) v x y,
+  s x = None -> s y = Some v -> x <> y.
+Proof.
+  intros.
+  unfold substore in H.
+  unfold substore; intros.
+  unfold not; intros.
+  congruence.
+Qed.
+
+Lemma substore_extension : forall s2 v x,
+  s2 x = None -> substore s2 (supdate x v s2).
+Proof.
+  intros.
+  unfold substore in H.
+  unfold substore; intros.
+  rewrite <- H0.
+  apply supdate_other.
+  apply substore_notin with (s:=s2) (v:=v0); auto.
+Qed.
+
+Lemma substore_refl : forall s1,
+  substore s1 s1.
+Proof.
+  unfold substore; intros.
+  easy.
+Qed.
+
+Lemma substore_trans : forall s1 s2 s3,
+  substore s1 s2 -> substore s2 s3 -> substore s1 s3.
+Proof.
+  intros.
+  unfold substore in H.
+  unfold substore in H0.
+  unfold substore; intros.
+  apply H0.
+  apply H.
+  easy.
+Qed.
+
+Lemma substore_extension_trans : forall s1 s2 v x,
+  substore s1 s2 -> s2 x = None -> substore s1 (supdate x v s2).
+Proof.
+  intros.
+  assert (substore s2 (supdate x v s2)).
+  apply substore_extension; easy.
+  apply substore_trans with (s2 := s2); easy.
+Qed.

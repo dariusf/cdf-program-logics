@@ -449,9 +449,9 @@ End StagesDeep.
       exact 3. (* anything is allowed it seems *)
     Qed.
 
-    Check ex_intro.
+    (* Check ex_intro. *)
     (* ex_intro : forall (A : Type) (P : A -> Prop) (x : A), P x -> exists y, P y *)
-    Print ex_forward_let1.
+    (* Print ex_forward_let1. *)
       (* (fun st : ...) is P *)
       (* (fexists "x" ...) is the witness x, which is what we are after *)
       (* (fw_let "x" ...) is the existential stmt P x, which is a derivation using the rules above, whose type includes the witness *)
@@ -469,29 +469,33 @@ SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }
 such that: 
 \exists (check, s3, h3, R3) \in SH, s3 \subset s2, h3 \subset h2, R2=R1 *)
     Theorem soundness :
-    forall s1 h1 e se he re (**) f ss hs rs,
-      bigstep s1 h1 e se he re ->
+    forall se1 he1 e se2 he2 re (**) f ss1 hs1 ss2 hs2 rs,
+      bigstep se1 he1 e se2 he2 re ->
+      substore se1 ss1 ->
+      (* he1 = hs1 -> *)
       forward e f ->
-      f true s1 h1 true ss hs rs ->
-      (* TODO sub-stack *)
-      (* ss = se /\ *)
-      hs = he /\ compatible rs re.
+      f true ss1 hs1 true ss2 hs2 rs ->
+      substore se2 ss2
+      (* /\ he2 = hs2 *)
+      /\ compatible rs re.
     Proof.
-      intros s1 h1 e se he re
-             f ss hs rs
+      intros se1 he1 e se he re
+             f ss1 hs1 ss2 hs2 rs
              Hb.
-      revert f ss hs rs.
+      revert f ss1 hs1 ss2 hs2 rs.
       induction Hb;
-      intros f ss hs rs Hf Hs.
+      intros f ss1 hs1 ss2 hs2 rs Hsub Hf Hs.
       - (* var. the proof comes down to the fact that both spec and program read
            s(x) and leave the heap unchanged. *)
         inv Hf.
         unfold ens in Hs; destr Hs.
         subst.
         unfold emp in H11.
-        rewrite H11.
         unfold compatible.
         heap.
+        unfold substore in Hsub.
+        symmetry in H.
+        specialize (Hsub v x H).
         congruence.
       - admit.
       -
@@ -503,11 +507,16 @@ such that:
       unfold fexists in Hs; destr Hs.
       (* see how it evaluates *)
       inv H5; destr H6.
-      unfold replace_ret in H9.
+      unfold replace_ret in H9; destr H9.
       (* try to meet in the middle *)
-      apply IHHb2 with (f:=f2) (ss:=s2).
-      easy.
-      specialize (IHHb1 f1 (supdate x v s1) h1 (norm v) H2).
+      (* apply IHHb2. *)
+      (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
+      (* easy. *)
+      (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
+      pose proof (substore_extension).
+      specialize (IHHb1 f1 (supdate "x" H0 ss1) hs1 H6 H7 (norm H10)).
+
+      assert (Hnotin: ss1 "x" = None). admit.
 
       (* now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
 
@@ -517,7 +526,7 @@ such that:
 
     Admitted.
 
-  Module SpecExamples.
+  (* Module SpecExamples.
     Example ex_spec_return_anything: exists x,
       sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm x] |= req emp.
     Proof.
@@ -551,6 +560,6 @@ such that:
       exists (hupdate x 1 hempty).
       repeat split; heap.
     Qed.
-  End SpecExamples.
+  End SpecExamples. *)
 
 End Flow3.
