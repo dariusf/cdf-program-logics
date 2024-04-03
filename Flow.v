@@ -10,7 +10,6 @@ Local Open Scope list_scope.
 
 (* some old tactics *)
 
-(* Tactic Notation "inv" constr(h) := inversion h; subst. *)
 Tactic Notation "inj" constr(h) := injection h as h; subst.
 Tactic Notation "ok" := intuition auto; try easy.
 
@@ -25,7 +24,9 @@ Tactic Notation "case_on" constr(e) ident(x) := destruct e eqn:x; ok.
 (* new ones *)
 
 Ltac inv H := inversion H; clear H; subst.
-Ltac invp H P := inversion H as P; clear H; subst.
+(* Tactic Notation "inv" constr(h) := inversion h; subst. *)
+(* Ltac invp H P := inversion H as P; clear H; subst. *)
+Tactic Notation "invp" constr(h) simple_intropattern(p) := inversion h as p; subst; clear h.
 
 Ltac HUNION n :=
   match n with
@@ -564,6 +565,8 @@ such that:
       (* r is the final result *)
       (* invp Hf [H2 H4]. *)
       inv Hf.
+      (* invp Hf [ | |Hff1 Hff2]. *)
+      (* inversion Hf as [ Hy Hz |  |Hff1 Hff2 Hz]. subst; clear Hf. *)
       (* the spec is of the form ex x. f1[x/r];f2 *)
       unfold fexists in Hs; destruct Hs as [_ [_ [v1 Hseq]]].
       (* see how it evaluates *)
