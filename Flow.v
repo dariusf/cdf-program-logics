@@ -334,7 +334,7 @@ End StagesDeep.
   (* we can't use hoas for this as the existential binding has to appear in the stack *)
   Definition fexists : ident -> flow -> flow := fun i f c1 s1 h1 c2 s2 h2 r =>
     c1 = true /\ c2 = true /\
-    (* s1 i = None /\ *)
+    s1 i = None /\
     exists v,
       f c1 (supdate i v s1) h1 c2 s2 h2 r.
 
@@ -497,8 +497,8 @@ Proof.
     apply substore_refl.
   -
     unfold wellformed; intros.
-    unfold fexists in H2; destruct H2 as [? [? [v ?]]]; subst.
-    unfold seq in H4. destruct H4 as [_ [_ [s3 [h3 [? [Hrr Hf2]]]]]]. subst.
+    unfold fexists in H2; destruct H2 as [? [? [? [v ?]]]]; subst.
+    unfold seq in H5; destruct H5 as [_ [_ [s3 [h3 [? [Hrr Hf2]]]]]]. subst.
 
     (* introduce well-formed lemma on replace_ret *)
     pose proof (replace_ret_wellformed x f1 true (supdate x v s1) h1 true s3 h3 v) as Hret.
@@ -519,9 +519,10 @@ Proof.
     unfold replace_ret in Hrr; destruct Hrr as [? [? Hf1]]; rewrite supdate_same in H1; inj H1.
     specialize (IHforward1 Hf1).
     assert (substore s1 (supdate x v s1)).
-    apply substore_extension.
-    admit.
-Admitted.
+    apply substore_extension; ok.
+    apply substore_trans with (s2 := supdate x v s1); ok.
+    apply substore_trans with (s2 := s3); ok.
+Qed.
 
 (* {ens emp} e {\phi}, 
 SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
@@ -558,7 +559,13 @@ such that:
         symmetry in H.
         specialize (Hsub v x H).
         congruence.
-      - admit.
+      -
+        inv Hf.
+        unfold ens in Hs; destr Hs; subst.
+        unfold compatible.
+        unfold pureconj in H8.
+        intuition auto.
+
       -
       (* we have an IH for each subexpr *)
       (* v is the intermediate result of evaluating e1 *)
@@ -568,7 +575,7 @@ such that:
       (* invp Hf [ | |Hff1 Hff2]. *)
       (* inversion Hf as [ Hy Hz |  |Hff1 Hff2 Hz]. subst; clear Hf. *)
       (* the spec is of the form ex x. f1[x/r];f2 *)
-      unfold fexists in Hs; destruct Hs as [_ [_ [v1 Hseq]]].
+      unfold fexists in Hs; destruct Hs as [_ [_ [Hnotin [v1 Hseq]]]].
       (* see how it evaluates *)
       unfold seq in Hseq; destruct Hseq as [_ [_ [s3 [h3 [? [Hrr ?]]]]]].
       unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]].
@@ -583,7 +590,6 @@ such that:
       (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
       (* easy. *)
       (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
-      assert (Hnotin: ss1 x = None). admit.
       pose proof (substore_extension_trans s ss1 v1 x Hsub Hnotin) as Hha.
       specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s3 h3 (norm H10) Hha H2 H13).
       destruct IHHb1 as [IH1 IH2].
