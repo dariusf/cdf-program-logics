@@ -606,15 +606,21 @@ such that:
       rewrite supdate_same.
       (* need to know substore (supdate x v1 ss1) H6 is preserved by all spec/f eval *)
       (* but how to know that, as we can give any f *)
-      assert (Hpreserve : substore (supdate x v1 ss1) s3). admit.
-      unfold substore in Hpreserve.
-      apply Hpreserve.
+      pose proof (forward_wellformed _ _ true (supdate x v1 ss1) hs1 true s3 h3 (norm H10) H2) as Hf1wf.
+      unfold wellformed in Hf1wf.
+
+      (* assert (Hpreserve : substore (supdate x v1 ss1) s3). admit. *)
+      (* apply Hf1wf. *)
+      (* unfold substore in Hpreserve. *)
+      (* apply Hpreserve. *)
+      apply Hf1wf.
+      ok.
       rewrite supdate_same.
       reflexivity.
 
 (* https://xavierleroy.org/courses/EUTypes-2019/slides.pdf *)
 
-    Admitted.
+    Qed.
 
   (* Module SpecExamples.
     Example ex_spec_return_anything: exists x,
