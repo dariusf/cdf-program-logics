@@ -95,3 +95,27 @@ Proof.
   apply H.
   assumption.
 Qed.
+
+
+
+Section Well_founded_Nat.
+
+  Local Open Scope nat_scope.
+  Variable A : Type.
+
+  Variable f : A -> nat.
+  Definition ltof (a b:A) := f a < f b.
+  Definition gtof (a b:A) := f b > f a.
+
+  Theorem well_founded_ltof : well_founded ltof.
+  Proof.
+    unfold well_founded.
+    assert (H : forall n (a:A), f a < n -> Acc ltof a).
+    { intro n; induction n as [|n IHn].
+      - intros a Ha; absurd (f a < 0); auto. apply Nat.nlt_0_r.
+      - intros a Ha. apply Acc_intro. unfold ltof at 1. intros b Hb.
+        apply IHn. apply Nat.lt_le_trans with (f a); auto. now apply Nat.succ_le_mono. }
+    intros a. apply (H (S (f a))). apply Nat.lt_succ_diag_r.
+  Defined.
+
+End Well_founded_Nat.
