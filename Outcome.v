@@ -89,12 +89,10 @@ Section Bigstep.
   Inductive resources := rb (l:nati) (u:nati).
   Definition model := store -> resources -> Prop.
 
+  Definition assertion := store -> Prop.
   Definition rassertion := store -> store -> Prop.
-  Definition precond := rassertion.
+  Definition precond := assertion.
   Definition postcond := val -> rassertion.
-
-  Definition aand (P Q: rassertion) : rassertion :=
-    fun old s => P old s /\ Q old s.
 
   Inductive rea := Term | MayLoop | Loop. (* resource assertion *)
   Inductive lar := LR (d:precond) (r:rea). (* logic and resource *)
@@ -103,7 +101,7 @@ Section Bigstep.
     | ok_er_nt : postcond -> precond -> precond -> outcome.
 
   Definition ok_only (q:postcond) : outcome := ok_er_nt q
-    (fun _ _ => False) (fun _ _ => False).
+    (fun _ => False) (fun _ => False).
 
   (* TODO sl entailment *)
   (* TODO resource entailment *)
@@ -143,10 +141,13 @@ Section Bigstep.
   Definition triple (P: precond) (e: expr) (Q: outcome) : Prop :=
     forall ok er nt r s s1,
       Q = ok_er_nt ok er nt ->
-      P s s ->
+      P s ->
            (eval[ s, e ] => [ s1, Some r ] -> ok r s s1)
-        /\ (eval[ s, e ] => [ s1, None ] -> er s s)
-        /\ (diverges s e -> nt s s).
+        /\ (eval[ s, e ] => [ s1, None ] -> er s)
+        /\ (diverges s e -> nt s).
+
+  Definition aand (P:assertion) (Q:rassertion) : rassertion :=
+    fun old s => P old /\ Q old s.
 
   Lemma f_pconst : forall v p,
     triple p (pconst v) (ok_only (fun r => aand p (fun old s => r = v))).
@@ -169,19 +170,31 @@ Section Bigstep.
   (* or *)
   (* old(x)=1 /\ x=3 /\ y=4 *)
 
-  Definition update (p:rassertion) (x1 x2:ident) : rassertion :=
+  Definition update (p:assertion) (x1 x2:ident) : rassertion :=
       fun old s =>
-        forall v1 v2 s1,
-        (* exists u, *)
-        Some v1 = s x1 ->
-        Some v2 = s x2 ->
-        (* s1 = supdate x1 v2 (supdate u v1 s) -> p old s1. *)
-        s1 = supdate x1 v2 s -> p old s1.
+        forall v2,
+        Some v2 = old x2 ->
+        p old /\ s = supdate x1 v2 old.
+
+  Example e2 : forall old s x y,
+    old y = Some 2 ->
+    update (fun s => s x = Some 1) x y old s ->
+    (fun old s => old x = Some 1 /\ s x = Some 2) old s.
+  Proof.
+    intros.
+    simpl.
+    unfold update in H0.
+    symmetry in H.
+    specialize (H0 2 H).
+    destruct H0.
+    split.
+    auto.
+    rewrite H1.
+    now rewrite supdate_same.
+  Qed.
 
   Lemma f_passign : forall x1 x2 p,
-    triple p (passign x1 x2) (ok_only (fun _ =>
-      update p x1 x2
-      )).
+    triple p (passign x1 x2) (ok_only (fun _ => update p x1 x2)).
   Proof.
     intros.
     unfold triple.
@@ -190,37 +203,13 @@ Section Bigstep.
     repeat split; intros.
     - rewrite <- H2.
       inversion H3; subst; clear H3.
-      (* remember ident as z. *)
-      (* pose (ident). *)
-      (* set ident as x3. *)
       unfold update.
-      (* exists  *)
       intros.
-      (* eexists. *)
-      (* exists v; intros.
-      exists v; intros.
-      exists s x1; intros. *)
-      (* inversion H3; subst; clear H3. *)
-      assert (s = supdate x1 v2 (supdate x1 v s)).
-      rewrite supdate_same in H.
-      (* congruence. *)
-      rewrite H7 in H9.
-      injection H; intros.
-      injection H9; intros.
-      subst.
-
-      admit.
-      now rewrite <- H2.
-      (* pose ident. *)
-      (* exists r. *)
-      (* admit. *)
-      (* rewrite H6.
-      f_equal.
-      admit. *)
+      split. auto.
+      congruence.
     - inversion H3.
     - inversion H3.
-  Admitted.
-  (* Qed. *)
+  Qed.
 
   (* Inductive forward : precond -> expr -> outcome -> Prop :=
 
