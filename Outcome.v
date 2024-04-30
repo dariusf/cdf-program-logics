@@ -89,12 +89,12 @@ Section Bigstep.
   Inductive resources := rb (l:nati) (u:nati).
   Definition model := store -> resources -> Prop.
 
-  Definition assertion := store -> Prop.
-  Definition precond := assertion.
-  Definition postcond := val -> assertion.
+  Definition rassertion := store -> store -> Prop.
+  Definition precond := rassertion.
+  Definition postcond := val -> rassertion.
 
-  Definition aand (P Q: assertion) : assertion :=
-    fun s => P s /\ Q s.
+  Definition aand (P Q: rassertion) : rassertion :=
+    fun old s => P old s /\ Q old s.
 
   Inductive rea := Term | MayLoop | Loop. (* resource assertion *)
   Inductive lar := LR (d:precond) (r:rea). (* logic and resource *)
@@ -102,7 +102,8 @@ Section Bigstep.
   Inductive outcome : Type :=
     | ok_er_nt : postcond -> precond -> precond -> outcome.
 
-  Definition ok_only (q:postcond) : outcome := ok_er_nt q (fun _ => False) (fun _ => False).
+  Definition ok_only (q:postcond) : outcome := ok_er_nt q
+    (fun _ _ => False) (fun _ _ => False).
 
   (* TODO sl entailment *)
   (* TODO resource entailment *)
@@ -111,12 +112,25 @@ Section Bigstep.
 
   (* TODO defn of compose is wrong *)
 
-  Definition compose (v:ident) (P Q:assertion) : assertion :=
+  (*
+    (old(x)=1 /\ x=2) o{x} (old(x)=2 /\ x=3)
+    ==> ex u. (old(x)=1 /\ x=2)[x:=u] /\ (old(x)=2 /\ x=3)[old(x):=u]
+    ==> ex u. old(x)=1 /\ u=2 /\ u=2 /\ x=3
+    ==> ex u. old(x)=1 /\ u=2 /\ x=3
+  *)
+  (*
+    (fun old s => old x=1 /\ s x=2) o{x} (fun old s => old x=2 /\ s x=3)
+    ==> ex u. (fun old s => old x=1 /\ s x=2) /\ (fun old s => old x=2 /\ s x=3)
+  *)
+  (* composition of relational assertions *)
+  (* Definition compose u (p1 p2:rassertion) : rassertion :=
+    fun old s => p1 old u /\ p2 u s
+  . *)
+  (* Definition compose (v:ident) (P Q:rassertion) : rassertion := *)
   (* say P is (fun s1 => s1 "x" = 1) *)
-    fun s => exists u, P (supdate v u s) /\ Q s
+    (* fun old s => exists u, P (supdate v u s) /\ Q s *)
     (* TODO this is existential on value, not variable *)
     (* being able to refer to old(v) is a relational assertion *)
-  .
 
   CoInductive diverges : store -> expr -> Prop :=
     | div_pcall : forall e y v s f a s1,
@@ -127,14 +141,15 @@ Section Bigstep.
     .
 
   Definition triple (P: precond) (e: expr) (Q: outcome) : Prop :=
-    forall ok er nt r s s1, Q = ok_er_nt ok er nt ->
-      P s ->
-          (eval[ s, e ] => [ s1, Some r ] -> ok r s1)
-        /\ (eval[ s, e ] => [ s1, None ] -> er s)
-        /\ (diverges s e -> nt s).
+    forall ok er nt r s s1,
+      Q = ok_er_nt ok er nt ->
+      P s s ->
+           (eval[ s, e ] => [ s1, Some r ] -> ok r s s1)
+        /\ (eval[ s, e ] => [ s1, None ] -> er s s)
+        /\ (diverges s e -> nt s s).
 
   Lemma f_pconst : forall v p,
-    triple p (pconst v) (ok_only (fun r => aand p (fun s => r = v))).
+    triple p (pconst v) (ok_only (fun r => aand p (fun old s => r = v))).
   Proof.
     intros.
     unfold triple.
@@ -147,8 +162,26 @@ Section Bigstep.
     - inversion H3.
   Qed.
 
+  (* old(x)=1 /\ x=2 /\ y=4 *)
+  (* x=3 *)
+
+  (* ex u. old(x)=1 /\ u=2 /\ x=3 /\ y=4 *)
+  (* or *)
+  (* old(x)=1 /\ x=3 /\ y=4 *)
+
+  Definition update (p:rassertion) (x1 x2:ident) : rassertion :=
+      fun old s =>
+        forall v1 v2 s1,
+        (* exists u, *)
+        Some v1 = s x1 ->
+        Some v2 = s x2 ->
+        (* s1 = supdate x1 v2 (supdate u v1 s) -> p old s1. *)
+        s1 = supdate x1 v2 s -> p old s1.
+
   Lemma f_passign : forall x1 x2 p,
-    triple p (passign x1 x2) (ok_only (fun _ => compose x1 p (fun s => s x1 = s x2))).
+    triple p (passign x1 x2) (ok_only (fun _ =>
+      update p x1 x2
+      )).
   Proof.
     intros.
     unfold triple.
@@ -156,17 +189,34 @@ Section Bigstep.
     unfold ok_only in H; injection H; clear H; intros.
     repeat split; intros.
     - rewrite <- H2.
-      inversion H3; subst.
-      unfold compose.
-      exists v.
       inversion H3; subst; clear H3.
-      split.
+      (* remember ident as z. *)
+      (* pose (ident). *)
+      (* set ident as x3. *)
+      unfold update.
+      (* exists  *)
+      intros.
+      (* eexists. *)
+      (* exists v; intros.
+      exists v; intros.
+      exists s x1; intros. *)
+      (* inversion H3; subst; clear H3. *)
+      assert (s = supdate x1 v2 (supdate x1 v s)).
+      rewrite supdate_same in H.
+      (* congruence. *)
+      rewrite H7 in H9.
+      injection H; intros.
+      injection H9; intros.
+      subst.
+
+      admit.
+      now rewrite <- H2.
       (* pose ident. *)
       (* exists r. *)
-      admit.
-      rewrite H6.
+      (* admit. *)
+      (* rewrite H6.
       f_equal.
-      admit.
+      admit. *)
     - inversion H3.
     - inversion H3.
   Admitted.
