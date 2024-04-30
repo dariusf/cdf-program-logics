@@ -131,11 +131,23 @@ Section Bigstep.
     (* being able to refer to old(v) is a relational assertion *)
 
   CoInductive diverges : store -> expr -> Prop :=
+
     | div_pcall : forall e y v s f a s1,
       diverges s1 e ->
       s1 = supdate y v s ->
       fenv f = Some (fn y e) ->
       diverges s (pcall f a)
+
+    | div_pif_then : forall s x e1 e2,
+      diverges s e1 ->
+      s x = Some 0 ->
+      diverges s (pif x e1 e2)
+
+    | div_pif_else : forall s x e1 e2,
+      diverges s e2 ->
+      s x <> Some 0 ->
+      diverges s (pif x e1 e2)
+
     .
 
   Definition triple (P: precond) (e: expr) (Q: outcome) : Prop :=
@@ -146,11 +158,11 @@ Section Bigstep.
         /\ (eval[ s, e ] => [ s1, None ] -> er s)
         /\ (diverges s e -> nt s).
 
-  Definition aand (P:assertion) (Q:rassertion) : rassertion :=
+  Definition rand (P:assertion) (Q:rassertion) : rassertion :=
     fun old s => P old /\ Q old s.
 
   Lemma f_pconst : forall v p,
-    triple p (pconst v) (ok_only (fun r => aand p (fun old s => r = v))).
+    triple p (pconst v) (ok_only (fun r => rand p (fun old s => r = v))).
   Proof.
     intros.
     unfold triple.
@@ -158,13 +170,13 @@ Section Bigstep.
     unfold ok_only in H; injection H; clear H; intros.
     repeat split; intros.
     - inversion H3; subst; clear H3.
-      unfold aand; easy.
+      unfold rand; easy.
     - inversion H3.
     - inversion H3.
   Qed.
 
   Lemma f_var : forall x p,
-    triple p (pvar x) (ok_only (fun r => aand p (fun old s => Some r = old x))).
+    triple p (pvar x) (ok_only (fun r => rand p (fun old s => Some r = old x))).
   Proof.
     intros.
     unfold triple.
@@ -172,7 +184,7 @@ Section Bigstep.
     unfold ok_only in H; injection H; clear H; intros.
     repeat split; intros.
     - inversion H3; subst; clear H3.
-      unfold aand; easy.
+      unfold rand; easy.
     - inversion H3.
     - inversion H3.
   Qed.
@@ -223,6 +235,71 @@ Section Bigstep.
       congruence.
     - inversion H3.
     - inversion H3.
+  Qed.
+
+  Definition aand (p1 p2:assertion) : assertion :=
+    fun s => p1 s /\ p2 s.
+
+  Ltac inv H := inversion H; clear H; subst.
+
+  Lemma f_pif : forall x e1 e2 p s1a s1b s1c s2a s2b s2c,
+    triple (aand p (fun s => s x = Some 0)) e1 (ok_er_nt s1a s1b s1c) ->
+    triple (aand p (fun s => s x <> Some 0)) e2 (ok_er_nt s2a s2b s2c) ->
+    triple p (pif x e1 e2) (ok_er_nt
+      (fun r => fun old s => s1a r old s \/ s2a r old s)
+      (fun s => s1b s \/ s2b s)
+      (fun s => s1c s \/ s2c s)).
+  Proof.
+    intros.
+    unfold triple.
+    intros.
+    injection H1; clear H1; intros.
+    repeat split; intros.
+    - inv H5.
+      + unfold triple in H.
+        assert (ok_er_nt s1a s1b s1c = ok_er_nt s1a s1b s1c). { reflexivity. }
+        unfold aand in H. assert (p s /\ s x = Some 0). { auto. }
+        specialize (H s1a s1b s1c r s s1 H1 H3).
+        destruct H as [Hok [_ _]].
+        specialize (Hok H12).
+        now left.
+      + unfold triple in H0.
+        assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
+        unfold aand in H0. assert (p s /\ s x <> Some 0). { auto. }
+        specialize (H0 s2a s2b s2c r s s1 H1 H3).
+        destruct H0 as [Hok [_ _]].
+        specialize (Hok H12).
+        now right.
+    - inv H5.
+      + unfold triple in H.
+        assert (ok_er_nt s1a s1b s1c = ok_er_nt s1a s1b s1c). { reflexivity. }
+        unfold aand in H. assert (p s /\ s x = Some 0). { auto. }
+        specialize (H s1a s1b s1c 0 s s1 H1 H3).
+        destruct H as [_ [Her _]].
+        specialize (Her H12).
+        now left.
+      + unfold triple in H0.
+        assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
+        unfold aand in H0. assert (p s /\ s x <> Some 0). { auto. }
+        specialize (H0 s2a s2b s2c 0 s s1 H1 H3).
+        destruct H0 as [_ [Her _]].
+        specialize (Her H12).
+        now right.
+    - inv H5.
+      + unfold triple in H.
+        assert (ok_er_nt s1a s1b s1c = ok_er_nt s1a s1b s1c). { reflexivity. }
+        unfold aand in H. assert (p s /\ s x = Some 0). { auto. }
+        specialize (H s1a s1b s1c 0 s s1 H1 H3).
+        destruct H as [_ [_ Hnt]].
+        specialize (Hnt H9).
+        now left.
+      + unfold triple in H0.
+        assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
+        unfold aand in H0. assert (p s /\ s x <> Some 0). { auto. }
+        specialize (H0 s2a s2b s2c 0 s s1 H1 H3).
+        destruct H0 as [_ [_ Hnt]].
+        specialize (Hnt H9).
+        now right.
   Qed.
 
   (* Inductive forward : precond -> expr -> outcome -> Prop :=
