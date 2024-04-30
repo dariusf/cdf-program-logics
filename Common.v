@@ -52,8 +52,7 @@ Qed.
 Lemma substore_refl : forall s1,
   substore s1 s1.
 Proof.
-  unfold substore; intros.
-  easy.
+  now unfold substore.
 Qed.
 
 Lemma substore_trans : forall s1 s2 s3,
@@ -64,8 +63,7 @@ Proof.
   unfold substore in H0.
   unfold substore; intros.
   apply H0.
-  apply H.
-  easy.
+  now apply H.
 Qed.
 
 Lemma substore_extension_trans : forall s1 s2 v x,
@@ -73,8 +71,8 @@ Lemma substore_extension_trans : forall s1 s2 v x,
 Proof.
   intros.
   assert (substore s2 (supdate x v s2)).
-  apply substore_extension; easy.
-  apply substore_trans with (s2 := s2); easy.
+  now apply substore_extension.
+  now apply substore_trans with (s2 := s2).
 Qed.
 
 Lemma substore_extension_left : forall s1 s2 v x,
