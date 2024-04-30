@@ -163,6 +163,20 @@ Section Bigstep.
     - inversion H3.
   Qed.
 
+  Lemma f_var : forall x p,
+    triple p (pvar x) (ok_only (fun r => aand p (fun old s => Some r = old x))).
+  Proof.
+    intros.
+    unfold triple.
+    intros.
+    unfold ok_only in H; injection H; clear H; intros.
+    repeat split; intros.
+    - inversion H3; subst; clear H3.
+      unfold aand; easy.
+    - inversion H3.
+    - inversion H3.
+  Qed.
+
   (* old(x)=1 /\ x=2 /\ y=4 *)
   (* x=3 *)
 
