@@ -8,6 +8,17 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
+Ltac inv H := inversion H; clear H; subst.
+
+(* https://github.com/mattam82/Coq-Equations/blob/main/theories/Init.v#L148 *)
+Ltac forward_gen H tac :=
+  match type of H with
+  | forall (_ : ?X), _ => let H' := fresh in assert (H':X) ; [tac|specialize (H H'); clear H']
+  end.
+
+Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac).
+Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
+
 Definition val := Z.
 
 Inductive expr : Type :=
@@ -240,8 +251,6 @@ Section Bigstep.
   Definition aand (p1 p2:assertion) : assertion :=
     fun s => p1 s /\ p2 s.
 
-  Ltac inv H := inversion H; clear H; subst.
-
   Lemma f_pif : forall x e1 e2 p s1a s1b s1c s2a s2b s2c,
     triple (aand p (fun s => s x = Some 0)) e1 (ok_er_nt s1a s1b s1c) ->
     triple (aand p (fun s => s x <> Some 0)) e2 (ok_er_nt s2a s2b s2c) ->
@@ -257,11 +266,11 @@ Section Bigstep.
     repeat split; intros.
     - inv H5.
       + unfold triple in H.
-        assert (ok_er_nt s1a s1b s1c = ok_er_nt s1a s1b s1c). { reflexivity. }
-        unfold aand in H. assert (p s /\ s x = Some 0). { auto. }
-        specialize (H s1a s1b s1c r s s1 H1 H3).
+        specialize (H s1a s1b s1c r s s1).
+        unfold aand in H.
+        forward H by reflexivity. forward H by intuition.
         destruct H as [Hok [_ _]].
-        specialize (Hok H12).
+        forward Hok by assumption.
         now left.
       + unfold triple in H0.
         assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
@@ -301,35 +310,6 @@ Section Bigstep.
         specialize (Hnt H9).
         now right.
   Qed.
-
-  (* Inductive forward : precond -> expr -> outcome -> Prop :=
-
-    | f_pvar : forall x s,
-      forward s (pvar x) (ok_only (fun r => aand s (fun s => Some r = s x)))
-
-    | f_pconst : forall c s,
-      forward s (pconst c) (ok_only (fun r => aand s (fun s => r = c)))
-
-    | f_passign : forall x1 x2 s,
-      forward s (passign x1 x2) (ok_only (fun _ => compose x1 s (fun s => s x1 = s x2)))
-      (*
-        S o{v} (v=x)
-        ==> ex u. S[v:=u] /\ (v=x)[old(v):=u]
-        ==> ex u. S[v:=u] /\ v=x
-      *)
-. *)
-
-  (* Example e2 : forall x1 x2 s,
-    (* st = supdate x2 1 (supdate x1 0 sempty) -> *)
-    forward s (passign x1 x2) (ok_only (fun _ => fun s => s x1 = s x2)).
-  Proof.
-    intros.
-    constructor.
-  Qed. *)
-
-    (* TODO if *)
-    (* | f_pif : forall c s x e1 e2,
-      forward s (pif x e1 e2) (ok_only (fun r => aand s (fun s => r = c))) *)
 
     (* TODO let *)
 
