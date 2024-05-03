@@ -2,8 +2,10 @@
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
 From CDF Require Import Common Sequences.
+From Coq Require Import ssreflect ssrfun ssrbool.
 
 Local Open Scope string_scope.
+Local Open Scope core_scope.
 (* Local Open Scope nat_scope. *)
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
@@ -96,8 +98,191 @@ Section Bigstep.
     rewrite H; now rewrite supdate_same.
   Qed.
 
-  Inductive nati := n (n:nat) | inf.
-  Inductive resources := rb (l:nati) (u:nati).
+  Section RC.
+    Local Open Scope nat_scope.
+    Inductive nati := n (n:nat) | inf.
+    Coercion n : nat >-> nati.
+
+    Definition nati_le (a b:nati) : Prop :=
+      match a, b with
+      | n a, n b => (a<=b)%nat
+      | n _, inf => True
+      | inf, n _ => False
+      | inf, inf => True
+      end.
+
+    Definition nati_plus (a b:nati) : nati :=
+      match a, b with
+      | n a, n b => n (a+b)%nat
+      | n _, inf => inf
+      | inf, n _ => inf
+      | inf, inf => inf
+      end.
+
+    Declare Scope nati_scope.
+    Delimit Scope nati_scope with nati.
+    Notation "x <= y" := (nati_le x y) : nati_scope.
+    Notation "x >= y" := (nati_le y x) : nati_scope.
+    Notation "x > y" := (nati_le y x /\ y <> x) : nati_scope.
+    Notation "x + y" := (nati_plus x y) : nati_scope.
+    Bind Scope nati_scope with nati.
+
+    Inductive resources := rb (l:nati) (u:nati).
+
+    Definition resources_le (b a:resources) : Prop :=
+      match b, a with
+      | rb bl bu, rb al au =>
+        (al <= bl /\ bu <= au)%nati
+      end.
+
+    Declare Scope resources_scope.
+    Delimit Scope resources_scope with resources.
+    Notation "a <= b" := (resources_le a b) : resources_scope.
+    (* Bind Scope resources_scope with resources. *)
+
+    Lemma resources_largest : forall r, (r <= (rb 0 inf))%resources.
+    Proof.
+      rewrite /resources_le => r.
+      destruct r.
+      rewrite /nati_le.
+      split.
+      destruct l; intuition lia.
+      destruct u; intuition lia.
+    Qed.
+
+    (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
+    Definition resources_split (a b c:resources) : Prop :=
+      match a, b, c with
+      | rb al au, rb bl bu, rb cl cu =>
+        (bu <= au /\ al + bu <= au + bl ->
+        (forall xi, xi + bl >= al -> cl <= xi) -> (* minimality *)
+        (forall xi, xi + bu >= au -> xi <= cu) -> (* maximality *)
+        cl + bl >= al /\ cu + bu <= au)%nati
+      end.
+
+    Example e1_split : resources_split
+      (rb 0 3) (rb 0 2) (rb 0 1).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e2_split : resources_split
+      (rb 0 inf) (rb 0 2) (rb 0 4).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e5_split : resources_split
+      (rb 0 inf) (rb 0 2) (rb 0 1).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e3_split : resources_split
+      (rb 0 inf) (rb 0 2) (rb 0 inf).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e4_split : resources_split
+      (rb 0 inf) (rb 0 inf) (rb 0 inf).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e6_split : resources_split
+      (rb 0 inf) (rb 0 inf) (rb 0 0).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e7_split : resources_split
+      (rb 0 inf) (rb 0 inf) (rb 0 0).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    (* Lemma resources_split_undefined : forall a b c al au bl bu,
+      a = rb al au ->
+      b = rb bl bu ->
+      (bu > au)%nati ->
+      not (resources_split a b c).
+    Proof.
+      unfold not; intros; subst.
+      destruct H1.
+      apply: H0.
+
+      unfold resources_split in H2; destruct c.
+
+      unfold nati_le in H.
+      destruct au.
+      destruct bu.
+      induction H.
+      - reflexivity.
+      -
+
+      destruct au.
+      destruct bu.
+      f_equal.
+    Admitted. *)
+
+    Definition rc_assert := resources -> Prop.
+    Definition rc (l:nati) (u:nati) : rc_assert :=
+      fun r =>
+        match r with | rb ml mu => ml = l /\ mu = u end.
+
+    Definition rc_entail (a b:rc_assert) : Prop :=
+      forall r, a r -> b r.
+    Definition rc_and (a b:rc_assert) : rc_assert :=
+      fun r => a r /\ b r.
+    Definition rc_equiv (a b:rc_assert) : Prop :=
+      forall r, a r <-> b r.
+    Definition rc_false : rc_assert := fun r => False.
+
+    Lemma rc_eq : forall al au bl bu,
+      rc_entail (rc al au) (rc bl bu) <->
+      al = bl /\ au = bu.
+    Proof.
+      intros.
+      split.
+      - intros. unfold rc_entail in H. unfold rc in H. specialize (H (rb al au)).
+        simpl in H.
+        now apply H.
+      - intros. destruct H. subst. unfold rc_entail. intros. assumption.
+    Qed.
+
+    Lemma rc_eq1 : forall al au bl bu,
+      (rc_equiv (rc_and (rc al au) (rc bl bu)) (rc al au)) <->
+      al = bl /\ au = bu.
+    Proof.
+      move=> al au bl bu.
+      split; intros.
+      - unfold rc_equiv in H.
+      unfold rc_and in H.
+      unfold rc in H.
+      specialize (H (rb al au)).
+      destruct H.
+      forward H0 by intuition.
+      destruct H0.
+      auto.
+      - destruct H.
+      unfold rc_equiv.
+      unfold rc_and.
+      unfold rc.
+      subst.
+      intros.
+      intuition.
+    Qed.
+
+    Lemma rc_contradiction : forall al au bl bu,
+      al <> bl \/ au <> bu ->
+        rc_equiv (rc_and (rc al au) (rc bl bu)) rc_false.
+    Proof.
+      move=> al au bl bu.
+      case=>[H|H].
+      - rewrite /rc_equiv /rc_and /rc /rc_false => r.
+      intuition.
+      destruct r.
+      (* move: H1 H2 => [? ?] [? ?]. *)
+      destruct H1; destruct H2.
+      congruence.
+      - rewrite /rc_equiv /rc_and /rc /rc_false => r.
+      destruct r.
+      intuition.
+      congruence.
+    Qed.
+
+    (* Inductive rea := Term | MayLoop | Loop. *)
+    (* resource assertion *)
+
+  End RC.
+
   Definition model := store -> resources -> Prop.
 
   Definition assertion := store -> Prop.
@@ -105,8 +290,8 @@ Section Bigstep.
   Definition precond := assertion.
   Definition postcond := val -> rassertion.
 
-  Inductive rea := Term | MayLoop | Loop. (* resource assertion *)
-  Inductive lar := LR (d:precond) (r:rea). (* logic and resource *)
+  (* Inductive lar := LR (d:precond) (r:rea). *)
+  (* logic and resource *)
 
   Inductive outcome : Type :=
     | ok_er_nt : postcond -> precond -> precond -> outcome.
@@ -317,5 +502,5 @@ Section Bigstep.
     (* | f_pcall : forall y b f c r x d,
       fenv f = Some (fn y b) ->
       forward (LR d r) (pcall f x) (ok_only (fun r => aand s (fun s => r = c))) *)
-  
+
 End Bigstep.
