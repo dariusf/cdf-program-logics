@@ -280,7 +280,7 @@ Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
 
     Definition mayloop := rc 0 inf.
     Definition loop := rc inf inf.
-    Definition term x := rc 0 x.
+    Definition term x := rc 0 x. (* TODO *)
 
     Definition rc_entail (a b:rc_assert) : Prop :=
       forall r, a r -> b r.
@@ -289,6 +289,29 @@ Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
     Definition rc_equiv (a b:rc_assert) : Prop :=
       forall r, a r <-> b r.
     Definition rc_false : rc_assert := fun r => False.
+
+    (* triangle *)
+    Definition rc_split (a b:rc_assert) : rc_assert := fun r =>
+      forall r1 r2,
+      resources_split r r1 r2 ->
+      a r1 /\ b r2.
+
+    Definition rc_entail_frame (a b c:rc_assert) : Prop :=
+      rc_entail a (rc_split b c).
+
+    Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      split.
+      unfold resources_split in H0.
+      destruct r.
+      destruct r1.
+      destruct r2.
+      (* TODO *)
+    Abort.
 
     Lemma rc_eq : forall al au bl bu,
       rc_entail (rc al au) (rc bl bu) <->
