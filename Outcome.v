@@ -186,141 +186,74 @@ Section RC.
 
   Section Examples.
 
-    Lemma nati_leq_move : forall a b c,
-      (c > 0)%nat ->
-      (a + S b <= n c <-> a + b <= Nat.pred c)%nati.
-    Proof.
-    destruct a.
-    - induction n.
-      + simpl; split; lia.
-      + 
-      split; intros.
-      --
-      simpl in H0.
-      simpl.
-      rewrite plus_n_Sm.
-      apply (IHn _ c). auto.
-      simpl.
-      rewrite plus_n_Sm in H0.
-      assumption.
-      --
-      simpl.
-      rewrite plus_n_Sm.
-      apply IHn. assumption.
-      simpl in H0.
-      rewrite plus_n_Sm in H0.
-      assumption.
-    - intuition.
-
-      (* unfold Nat.pred.
-      lia.
-      now auto.
-      simpl; now apply Le.le_Sn_le_stt.
-
-      intros.
-      inversion H.
-      rewrite (Nat.lt_succ_pred (Nat.pred b)); auto.
-      unfold lt. *)
-      
-      (* Search (_ = Nat.pred _ -> Nat.pred _ < _). *)
-(* 
-      rewrite H0.
-      unfold lt.
-      simpl.
-      apply Arith_prebase.lt_pred_n_n_stt.
-
-      Search (Nat.pred _ < _).
-      Search (S (Nat.pred _)). *)
-
-      (* Search (_ <= _ -> _ <= _). *)
-      (* nowsimpl. *)
-    (* simpl.
-      simpl.
-        admit.
-      + admit. *)
-      (* induction b; intros.
-      - 
-      unfold nati_le.
-      rewrite nati_plus_0.
-      (* destruct (a+1)%nati. *)
-      destruct a.
-      +
-        simpl.
-      admit. *)
-
-    Qed.
-
-    Lemma geq_succ : forall m n, n > S m -> n > 0.
-    Proof.
-      lia.
-    Qed.
-
-    Lemma nati_plus_leq : forall a b c,
-      (c > b)%nat -> (a + n b <= n c <-> a <= c - b)%nati.
-    Proof.
-      induction b; intros.
-      - rewrite nati_plus_0.
-        rewrite Nat.sub_0_r.
-        intuition.
-      -
-      (* Search (_ > S _ -> _ > 0). *)
-      pose proof (geq_succ _ _ H).
-
-      (* assert (forall a b c, (c > 0)%nat -> (a + S b <= n c <-> a + b <= Nat.pred c))%nati. admit. *)
-      assert (forall b c, (c > 0)%nat -> (c - S b = Nat.pred c - b))%nati. lia.
-      rewrite nati_leq_move; auto.
-      rewrite H1; auto.
-      apply IHb.
-      lia.
-    Qed.
-
     Example e1_split : resources_split
       (rb 0 3) (rb 0 2) (rb 0 1).
     Proof. unfold resources_split. intros. intuition.
     - now rewrite nati_plus_0 in H1.
-    -
-      (* assert (forall a b c, a + n b <= n c <-> a <= c - b)%nati. admit. *)
-      rewrite nati_plus_leq in H1.
-      lia.
-      simpl in H1.
-      assumption.
+    - rewrite nati_plus_leq in H1; try lia.
+      now simpl in H1.
     - now simpl.
     - now simpl.
     Qed.
-    (* simpl. lia. Qed. *)
 
     (* cannot take more than available *)
     Example e1_split_f : resources_split
       (rb 0 3) (rb 0 2) (rb 0 2).
-    Proof. unfold resources_split. intros. simpl. Fail lia. Abort.
+    Proof. unfold resources_split. intros. intuition.
+    - now rewrite nati_plus_0 in H1.
+    - rewrite nati_plus_leq in H1; try lia.
+      simpl in H1.
+    Abort.
 
     (* given inf, we can have as much remaining as we want *)
     Example e2_split : resources_split
-      (rb 0 inf) (rb 0 2) (rb 0 4).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+      (rb 0 inf) (rb 0 2) (rb 0 inf).
+    Proof. unfold resources_split. intros. intuition.
+      - now rewrite nati_plus_0 in H1.
+      - now rewrite nati_leq_inf in H1.
+      - now simpl.
+    Qed.
 
     Example e3_split : resources_split
       (rb 0 inf) (rb 0 2) (rb 0 inf).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+    Proof. unfold resources_split. intros. intuition.
+      - now rewrite nati_plus_0 in H1.
+      - now rewrite nati_leq_inf in H1.
+      - now simpl.
+    Qed.
 
-    (* or as little *)
+    (* but not as little *)
     Example e5_split : resources_split
       (rb 0 inf) (rb 0 2) (rb 0 1).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+    Proof. unfold resources_split. intros. intuition.
+      - now rewrite nati_plus_0 in H1.
+      - rewrite nati_leq_inf in H1.
+    Abort.
 
     Example e6_split : resources_split
       (rb 0 inf) (rb 0 inf) (rb 0 0).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+    Proof. unfold resources_split. intros. intuition.
+      - now rewrite nati_plus_0 in H1.
+      - rewrite nati_leq_inf in H1.
+    Abort.
 
     (* we can even extract inf and have inf remaining *)
     Example e4_split : resources_split
       (rb 0 inf) (rb 0 inf) (rb 0 inf).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+    Proof. unfold resources_split. intros. intuition.
+      - now rewrite nati_plus_0 in H1.
+      - now rewrite nati_leq_inf in H1.
+      - now simpl.
+    Qed.
 
-    (* or nothing *)
+    (* but not nothing *)
     Example e7_split : resources_split
       (rb 0 inf) (rb 0 inf) (rb 0 0).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+    Proof. unfold resources_split. intros. intuition.
+      - now rewrite nati_plus_0 in H1.
+      - rewrite nati_leq_inf in H1.
+    Abort.
+
   End Examples.
 
   (* Lemma resources_split_undefined : forall a b c al au bl bu,
