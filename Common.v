@@ -256,3 +256,13 @@ Proof.
     + intros. simpl. split. easy. destruct n1; easy.
   - simpl. split. easy. destruct n0; easy.
 Qed.
+
+Lemma nati_le_inf_r : forall a m,
+  (a <= inf + m <-> a <= inf)%nati.
+Proof.
+  destruct a.
+  - destruct n.
+    + simpl. split. easy. destruct m; easy.
+    + intros. simpl. split. easy. destruct m; easy.
+  - simpl. split. easy. destruct m; easy.
+Qed.

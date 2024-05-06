@@ -329,17 +329,74 @@ Section RC.
   Definition rc_entail_frame (a b c:rc_assert) : Prop :=
     rc_entail a (rc_split b c).
 
+  Lemma aa : forall l1 l0,
+    (forall x : nati, (0 <= x + l0)%nati -> (l1 <= x)%nati) ->
+    (0 <= l1 + l0)%nati.
+  Proof.
+    intros.
+    specialize (H 0).
+    simpl.
+    destruct (l1 + l0)%nati.
+    lia.
+    easy.
+  Qed.
+
+  Lemma aa1 : forall (c b a:nati),
+    (a > b)%nati ->
+    (forall x, (a <= x + b)%nati -> (c <= x)%nati) ->
+    (a <= c + b)%nati ->
+    c = nati_min_minus a b.
+  Proof.
+    intros c b a H H0 H1.
+    unfold nati_min_minus.
+    destruct a as [na|]; destruct b as [nb|]; destruct c as [nc|].
+    - (* show that it's also bounded from above by na-nb *)
+    specialize (H0 (na - nb)).
+    rewrite nati_plus_ge in H1.
+    unfold nati_le in H. destruct H. inversion H.
+    + exfalso. apply H1. f_equal. easy.
+    + rewrite H3. inversion H2; lia.
+    + forward H0 by simpl; lia.
+    pose proof (nati_le_antisymm (na-nb) nc H1 H0).
+    symmetry. easy.
+
+    - simpl in *.
+    specialize (H0 na).
+    simpl in H0.
+    forward H0. lia. easy.
+    (* vacuously true as inf isn't smallest *)
+    - now simpl in *.
+    - now simpl in *.
+    - now simpl in *.
+    - now simpl in *.
+    - now simpl in *.
+    - now simpl in *.
+  Qed.
+
+
   Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
   Proof.
     unfold rc_entail_frame.
     unfold rc_entail.
     unfold rc_split.
     intros.
+    unfold resources_split in H0. destruct r. destruct r1. destruct r2.
+    destruct H.
+    subst.
+    forward H0 by unfold nati_le; destruct u0; easy.
+    forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
+    destruct H0 as [Hmin [Hmax [Hl Hu]]].
+
+    specialize (Hmin 0).
+    simpl in Hmin.
+    destruct l0.
+
+    unfold mayloop.
+    unfold rc.
+    intuition.
+    specialize (Hmin l0).
+
     split.
-    unfold resources_split in H0.
-    destruct r.
-    destruct r1.
-    destruct r2.
     (* TODO *)
   Abort.
 
