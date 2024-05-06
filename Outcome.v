@@ -163,24 +163,47 @@ Section RC.
         lia. *)
       admit.
       - admit.
-    Admitted. *)
+    Admitted.
+ *)
 
+
+    Lemma nati_le_antisymm : forall n m,
+      (n <= m -> m <= n -> n = m)%nati.
+    Proof.
+      intros n m H1 H2.
+      unfold nati_le in H1.
+      unfold nati_le in H2.
+      destruct n; destruct m.
+      - f_equal.
+        apply Nat.le_antisymm.
+        auto. auto.
+      - easy.
+      - easy.
+      - easy.
+    Qed.
 
     Lemma resources_split_equiv : forall a b c,
       resources_split a b c <-> resources_split_constr a b c.
     Proof.
       split; intros.
-      - unfold resources_split in H; destruct a; destruct b; destruct c.
-        unfold resources_split_constr; destruct l; destruct u; destruct l0; destruct u0.
+      - destruct a. destruct b. destruct c.
+        unfold resources_split in H.
+        unfold resources_split_constr.
         intros.
+        forward H by auto.
+        forward H by auto.
+        destruct H as [Hmin [Hmax [Hl Hu]]].
         split.
-        +
-        forward H by auto.
-        forward H by auto.
-        destruct H.
-        destruct H2.
-        (* destruct xi. *)
-        (* induction n4. *)
+        unfold nati_min_minus.
+        destruct l.
+        destruct l0.
+        rewrite nati_plus_ge in Hl.
+        (* TODO split should talk about how the lower bounds are related? *)
+        admit.
+        specialize (Hmin (n - n0)).
+        forward Hmin by simpl; lia.
+        pose proof (nati_le_antisymm _ _ Hl Hmin).
+        easy.
     Abort.
   End Constructive.
 
@@ -190,7 +213,7 @@ Section RC.
       (rb 0 3) (rb 0 2) (rb 0 1).
     Proof. unfold resources_split. intros. intuition.
     - now rewrite nati_plus_0 in H1.
-    - rewrite nati_plus_leq in H1; try lia.
+    - rewrite nati_plus_le in H1; try lia.
       now simpl in H1.
     - now simpl.
     - now simpl.
@@ -201,7 +224,7 @@ Section RC.
       (rb 0 3) (rb 0 2) (rb 0 2).
     Proof. unfold resources_split. intros. intuition.
     - now rewrite nati_plus_0 in H1.
-    - rewrite nati_plus_leq in H1; try lia.
+    - rewrite nati_plus_le in H1; try lia.
       simpl in H1.
     Abort.
 
@@ -210,7 +233,7 @@ Section RC.
       (rb 0 inf) (rb 0 2) (rb 0 inf).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
-      - now rewrite nati_leq_inf in H1.
+      - now rewrite nati_le_inf in H1.
       - now simpl.
     Qed.
 
@@ -218,7 +241,7 @@ Section RC.
       (rb 0 inf) (rb 0 2) (rb 0 inf).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
-      - now rewrite nati_leq_inf in H1.
+      - now rewrite nati_le_inf in H1.
       - now simpl.
     Qed.
 
@@ -227,14 +250,14 @@ Section RC.
       (rb 0 inf) (rb 0 2) (rb 0 1).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
-      - rewrite nati_leq_inf in H1.
+      - rewrite nati_le_inf in H1.
     Abort.
 
     Example e6_split : resources_split
       (rb 0 inf) (rb 0 inf) (rb 0 0).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
-      - rewrite nati_leq_inf in H1.
+      - rewrite nati_le_inf in H1.
     Abort.
 
     (* we can even extract inf and have inf remaining *)
@@ -242,7 +265,7 @@ Section RC.
       (rb 0 inf) (rb 0 inf) (rb 0 inf).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
-      - now rewrite nati_leq_inf in H1.
+      - now rewrite nati_le_inf in H1.
       - now simpl.
     Qed.
 
@@ -251,7 +274,7 @@ Section RC.
       (rb 0 inf) (rb 0 inf) (rb 0 0).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
-      - rewrite nati_leq_inf in H1.
+      - rewrite nati_le_inf in H1.
     Abort.
 
   End Examples.

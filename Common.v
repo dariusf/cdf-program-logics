@@ -163,7 +163,7 @@ Proof.
   - simpl. reflexivity.
 Qed.
 
-Lemma nati_leq_move : forall a b c,
+Lemma nati_le_move : forall a b c,
   (c > 0)%nat ->
   (a + S b <= n c <-> a + b <= Nat.pred c)%nati.
 Proof.
@@ -187,31 +187,67 @@ Proof.
   - intuition.
 Qed.
 
+Lemma nati_ge_move : forall a b c,
+  (c > 0)%nat ->
+  (a + S b >= n c <-> a + b >= Nat.pred c)%nati.
+Proof.
+  destruct a.
+  - induction n0.
+    + simpl; split; lia.
+    + split; intros.
+    * simpl in H0.
+      simpl.
+      rewrite plus_n_Sm.
+      apply (IHn0 _ c). auto.
+      simpl.
+      rewrite plus_n_Sm in H0.
+      assumption.
+    * simpl.
+      rewrite plus_n_Sm.
+      apply IHn0. assumption.
+      simpl in H0.
+      rewrite plus_n_Sm in H0.
+      assumption.
+  - intuition.
+Qed.
+
+
 Lemma geq_succ : forall m n, n > S m -> n > 0.
 Proof.
   lia.
 Qed.
 
-Lemma nati_plus_leq : forall a b c,
+Lemma nati_plus_le : forall a b c,
   (c > b)%nat -> (a + n b <= n c <-> a <= c - b)%nati.
 Proof.
   induction b; intros.
   - rewrite nati_plus_0.
     rewrite Nat.sub_0_r.
     intuition.
-  -
-  (* Search (_ > S _ -> _ > 0). *)
-  pose proof (geq_succ _ _ H).
-
-  (* assert (forall a b c, (c > 0)%nat -> (a + S b <= n c <-> a + b <= Nat.pred c))%nati. admit. *)
-  assert (forall b c, (c > 0)%nat -> (c - S b = Nat.pred c - b))%nati. lia.
-  rewrite nati_leq_move; auto.
-  rewrite H1; auto.
-  apply IHb.
-  lia.
+  - pose proof (geq_succ _ _ H).
+    assert (forall b c, (c > 0)%nat -> (c - S b = Nat.pred c - b))%nati. lia.
+    rewrite nati_le_move; auto.
+    rewrite H1; auto.
+    apply IHb.
+    lia.
 Qed.
 
-Lemma nati_leq_inf : forall a n,
+Lemma nati_plus_ge : forall a b c,
+  (c > b)%nat -> (a + n b >= n c <-> a >= c - b)%nati.
+Proof.
+  induction b; intros.
+  - rewrite nati_plus_0.
+    rewrite Nat.sub_0_r.
+    intuition.
+  - pose proof (geq_succ _ _ H).
+    assert (forall b c, (c > 0)%nat -> (c - S b = Nat.pred c - b))%nati. lia.
+    rewrite nati_ge_move; auto.
+    rewrite H1; auto.
+    apply IHb.
+    lia.
+Qed.
+
+Lemma nati_le_inf : forall a n,
   (a + n <= inf <-> a <= inf)%nati.
 Proof.
   destruct a.
