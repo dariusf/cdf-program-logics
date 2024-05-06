@@ -21,83 +21,6 @@ Ltac forward_gen H tac :=
 Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac).
 Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
 
-Definition val := Z.
-
-Inductive expr : Type :=
-  | pvar (x: ident)
-  | pconst (n: val)
-  | plet (x: ident) (e1: expr) (e2: expr)
-  | passign (x1: ident) (x2: ident)
-  | pif (x: ident) (e1: expr) (e2: expr)
-  | pcall (x: ident) (a: ident)
-  .
-
-(* Inductive eresult : Type :=
-  | enorm : val -> eresult
-  . *)
-Definition eresult := option val.
-
-Inductive fndef : Type := fn (i:ident) (b:expr).
-Definition fnenv : Type := ident -> option fndef.
-Definition fnenv_empty : fnenv := (fun _ => None).
-Definition fupdate (x: ident) (v: fndef) (s: fnenv) : fnenv :=
-  fun y => if string_dec x y then Some v else s y.
-
-Section Bigstep.
-
-  Variable fenv : fnenv.
-
-  Reserved Notation " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " (at level 50, left associativity).
-
-  CoInductive bigstep : store -> expr -> store -> eresult -> Prop :=
-
-    | eval_pvar : forall s x r,
-      s x = Some r ->
-      eval[ s, pvar x ]=>[ s, Some r ]
-
-    | eval_pconst : forall s x,
-      eval[ s, pconst x ] => [ s, Some x ]
-
-    | eval_plet : forall x e1 e2 v s s2 s1 r,
-      eval[ s, e1 ] => [ s1, Some v ] ->
-      eval[ supdate x v s1, e2 ] => [ s2, r] ->
-      eval[ s, plet x e1 e2 ] => [ s, r ]
-
-    | eval_pif_t : forall x e1 e2 s s1 r,
-      eval[ s, e1 ] => [ s1, r ] ->
-      s x = Some 0 ->
-      eval[ s, pif x e1 e2 ] => [ s1, r ]
-
-    | eval_pif_f : forall x e1 e2 s s1 r,
-      eval[ s, e2 ] => [ s1, r ] ->
-      s x <> Some 0 ->
-      eval[ s, pif x e1 e2 ] => [ s1, r ]
-
-    | eval_pcall : forall a f e s s1 r v y,
-      eval[ supdate y v s, e ] => [ s1, r ] ->
-      s a = Some v ->
-      fenv f = Some (fn y e) ->
-      eval[ s, pcall f a ] => [ s1, r ]
-
-    | eval_passign : forall x1 x2 s v s1,
-      s x2 = Some v ->
-      s1 = supdate x1 v s ->
-      eval[ s, passign x1 x2 ] => [ s1, Some 0 ]
-
-  where " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " := (bigstep s e s1 r)
-  .
-
-  Example e1 : forall x1 x2 s,
-    s = supdate x2 1 (supdate x1 0 sempty) ->
-    eval[ s, passign x1 x2 ] =>
-      [ supdate x1 1 s, Some 0 ].
-  Proof.
-    intros.
-    apply eval_passign with (v := 1).
-    2: reflexivity.
-    rewrite H; now rewrite supdate_same.
-  Qed.
-
   Section RC.
     Local Open Scope nat_scope.
     Inductive nati := n (n:nat) | inf.
@@ -170,7 +93,6 @@ Section Bigstep.
     (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
 
     Section Constructive.
-
 
       Definition nati_min_minus (a b:nati) : nati :=
         match a, b with
@@ -356,6 +278,10 @@ Section Bigstep.
       fun r =>
         match r with | rb ml mu => ml = l /\ mu = u end.
 
+    Definition mayloop := rc 0 inf.
+    Definition loop := rc inf inf.
+    Definition term x := rc 0 x.
+
     Definition rc_entail (a b:rc_assert) : Prop :=
       forall r, a r -> b r.
     Definition rc_and (a b:rc_assert) : rc_assert :=
@@ -421,6 +347,84 @@ Section Bigstep.
     (* resource assertion *)
 
   End RC.
+
+Definition val := Z.
+(* Inductive val := int (i:Z) | ni (n:nati). *)
+
+Inductive expr : Type :=
+  | pvar (x: ident)
+  | pconst (n: val)
+  | plet (x: ident) (e1: expr) (e2: expr)
+  | passign (x1: ident) (x2: ident)
+  | pif (x: ident) (e1: expr) (e2: expr)
+  | pcall (x: ident) (a: ident)
+  .
+
+(* Inductive eresult : Type :=
+  | enorm : val -> eresult
+  . *)
+Definition eresult := option val.
+
+Inductive fndef : Type := fn (i:ident) (b:expr).
+Definition fnenv : Type := ident -> option fndef.
+Definition fnenv_empty : fnenv := (fun _ => None).
+Definition fupdate (x: ident) (v: fndef) (s: fnenv) : fnenv :=
+  fun y => if string_dec x y then Some v else s y.
+
+Section Bigstep.
+
+  Variable fenv : fnenv.
+
+  Reserved Notation " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " (at level 50, left associativity).
+
+  CoInductive bigstep : store -> expr -> store -> eresult -> Prop :=
+
+    | eval_pvar : forall s x r,
+      s x = Some r ->
+      eval[ s, pvar x ]=>[ s, Some r ]
+
+    | eval_pconst : forall s x,
+      eval[ s, pconst x ] => [ s, Some x ]
+
+    | eval_plet : forall x e1 e2 v s s2 s1 r,
+      eval[ s, e1 ] => [ s1, Some v ] ->
+      eval[ supdate x v s1, e2 ] => [ s2, r] ->
+      eval[ s, plet x e1 e2 ] => [ s, r ]
+
+    | eval_pif_t : forall x e1 e2 s s1 r,
+      eval[ s, e1 ] => [ s1, r ] ->
+      s x = Some 0 ->
+      eval[ s, pif x e1 e2 ] => [ s1, r ]
+
+    | eval_pif_f : forall x e1 e2 s s1 r,
+      eval[ s, e2 ] => [ s1, r ] ->
+      s x <> Some 0 ->
+      eval[ s, pif x e1 e2 ] => [ s1, r ]
+
+    | eval_pcall : forall a f e s s1 r v y,
+      eval[ supdate y v s, e ] => [ s1, r ] ->
+      s a = Some v ->
+      fenv f = Some (fn y e) ->
+      eval[ s, pcall f a ] => [ s1, r ]
+
+    | eval_passign : forall x1 x2 s v s1,
+      s x2 = Some v ->
+      s1 = supdate x1 v s ->
+      eval[ s, passign x1 x2 ] => [ s1, Some 0 ]
+
+  where " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " := (bigstep s e s1 r)
+  .
+
+  Example e1 : forall x1 x2 s,
+    s = supdate x2 1 (supdate x1 0 sempty) ->
+    eval[ s, passign x1 x2 ] =>
+      [ supdate x1 1 s, Some 0 ].
+  Proof.
+    intros.
+    apply eval_passign with (v := 1).
+    2: reflexivity.
+    rewrite H; now rewrite supdate_same.
+  Qed.
 
   Definition model := store -> resources -> Prop.
 
