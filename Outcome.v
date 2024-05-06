@@ -150,43 +150,182 @@ Section Bigstep.
       destruct u; intuition lia.
     Qed.
 
-    (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
+    (* executions allowed by a can be decomposed into executions requiring b,
+      followed by executions requiring c.
+      informally, like a - b = c *)
     Definition resources_split (a b c:resources) : Prop :=
       match a, b, c with
       | rb al au, rb bl bu, rb cl cu =>
-        (bu <= au /\ al + bu <= au + bl ->
+        (* cannot take more resources than available *)
+        (bu <= au ->
+        (* could lead to cl > cu *)
+        al + bu <= au + bl ->
+        (* these conditions ensure that c is the largest resource consumption *)
         (forall xi, xi + bl >= al -> cl <= xi) -> (* minimality *)
         (forall xi, xi + bu >= au -> xi <= cu) -> (* maximality *)
+        (* ub must be less (as we can't take more than is available),
+          lb must be greater (as we must consume as least as much as required) *)
         cl + bl >= al /\ cu + bu <= au)%nati
       end.
+    (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
 
-    Example e1_split : resources_split
-      (rb 0 3) (rb 0 2) (rb 0 1).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+    Section Constructive.
 
-    Example e2_split : resources_split
-      (rb 0 inf) (rb 0 2) (rb 0 4).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
 
-    Example e5_split : resources_split
-      (rb 0 inf) (rb 0 2) (rb 0 1).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+      Definition nati_min_minus (a b:nati) : nati :=
+        match a, b with
+        | n a, n b => n (a-b)%nat
+        | n _, inf => 0
+        | inf, n _ => inf
+        | inf, inf => 0
+        end.
 
-    Example e3_split : resources_split
-      (rb 0 inf) (rb 0 2) (rb 0 inf).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+      Definition nati_max_minus (a b:nati) : nati :=
+        match a, b with
+        | n a, n b => n (a-b)%nat
+        | n _, inf => 0
+        | inf, n _ => inf
+        | inf, inf => inf
+        end.
 
-    Example e4_split : resources_split
-      (rb 0 inf) (rb 0 inf) (rb 0 inf).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+      Definition resources_split_constr (a b c:resources) : Prop :=
+        match a, b, c with
+        | rb al au, rb bl bu, rb cl cu =>
+          (* cannot take more resources than available *)
+          (bu <= au ->
+          (* lead to cl > cu *)
+          al + bu <= au + bl ->
+            cl = nati_min_minus al bl /\ cu = nati_max_minus au bu
+          )%nati
+            (* match al, au, bl, bu with
+            | n al, n au, n bl, n bu => cl = al - bl /\ cu = au - bu
+            | n al, n au, n bl, inf => False (* first condition *)
+            | n al, n au, inf, n bu => False (* not wf *)
+            | n al, n au, inf, inf => False (* first condition *)
+            | n al, inf, n bl, n bu => cl = al - bl /\ cu = inf
+            | n al, inf, n bl, inf => cl = al - bl /\ cu = inf
+            | n al, inf, inf, n bu => False (* not wf *)
+            | n al, inf, inf, inf => cl = inf /\ cu = inf
+            | inf, n au, n bl, n bu => False (* not wf *)
+            | inf, n au, n bl, inf => False (* not wf *)
+            | inf, n au, inf, n bu => False (* not wf *)
+            | inf, n au, inf, inf => False (* not wf *)
+            | inf, inf, n bl, n bu => cl = inf /\ cu = inf
+            | inf, inf, n bl, inf => cl = inf /\ cu = inf
+            | inf, inf, inf, n bu => False (* not wf *)
+            | inf, inf, inf, inf => cl = 0 /\ cu = inf
+            end)%nati *)
+        end.
 
-    Example e6_split : resources_split
-      (rb 0 inf) (rb 0 inf) (rb 0 0).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+      (* Lemma aaa : forall a b c,
+        (forall x : nati, (x + b >= a)%nati -> (x >= c)%nati)
+        /\ (c + b >= a)%nati
+        <->
+        c = nati_min_minus a b.
+      Proof.
+        intros.
+        split; intros.
+        - 
+          destruct H.
+          unfold nati_min_minus.
+          destruct a.
+          destruct b.
+          destruct c.
+          unfold nati_plus in H0.
+          unfold nati_le in H0.
+          inversion H0.
+          + rewrite Nat.add_sub.
+          reflexivity.
+          + 
 
-    Example e7_split : resources_split
-      (rb 0 inf) (rb 0 inf) (rb 0 0).
-    Proof. unfold resources_split. intros. simpl. lia. Qed.
+          Search ((_ + _) - _).
+          (* rewrite Nat.add *)
+          Print Init.Nat.sub.
+          Unset Printing Notations.
+          simpl.
+          lia.
+          simpl.
+
+          Unset Printing Coercions.
+          rewrite <- H0.
+
+          lia.
+          (* rewrite <- H0. *)
+          
+          (* 
+          (* specialize (H l1). *)
+          unfold nati_plus in H0.
+          destruct l1.
+          admit.
+          rewrite H0.
+          Unset Printing Notations. *)
+          (* rewrite <- H0.
+          lia.
+          rewrite <- H0.
+          lia.
+          rewrite <- H0.
+
+          lia. *)
+        admit.
+        - admit.
+      Admitted. *)
+
+
+      Lemma resources_split_equiv : forall a b c,
+        resources_split a b c <-> resources_split_constr a b c.
+      Proof.
+        split; intros.
+        - unfold resources_split in H; destruct a; destruct b; destruct c.
+          unfold resources_split_constr; destruct l; destruct u; destruct l0; destruct u0.
+          intros.
+          split.
+          +
+          forward H by auto.
+          forward H by auto.
+          forward H.
+          destruct xi.
+          induction n4.
+      Abort.
+    End Constructive.
+
+    Section Examples.
+      Example e1_split : resources_split
+        (rb 0 3) (rb 0 2) (rb 0 1).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+      (* cannot take more than available *)
+      Example e1_split_f : resources_split
+        (rb 0 3) (rb 0 2) (rb 0 2).
+      Proof. unfold resources_split. intros. simpl. Fail lia. Abort.
+
+      (* given inf, we can have as much remaining as we want *)
+      Example e2_split : resources_split
+        (rb 0 inf) (rb 0 2) (rb 0 4).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+      Example e3_split : resources_split
+        (rb 0 inf) (rb 0 2) (rb 0 inf).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+      (* or as little *)
+      Example e5_split : resources_split
+        (rb 0 inf) (rb 0 2) (rb 0 1).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+      Example e6_split : resources_split
+        (rb 0 inf) (rb 0 inf) (rb 0 0).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+      (* we can even extract inf and have inf remaining *)
+      Example e4_split : resources_split
+        (rb 0 inf) (rb 0 inf) (rb 0 inf).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+      (* or nothing *)
+      Example e7_split : resources_split
+        (rb 0 inf) (rb 0 inf) (rb 0 0).
+      Proof. unfold resources_split. intros. simpl. lia. Qed.
+    End Examples.
 
     (* Lemma resources_split_undefined : forall a b c al au bl bu,
       a = rb al au ->
