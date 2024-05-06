@@ -21,355 +21,429 @@ Ltac forward_gen H tac :=
 Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac).
 Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
 
-  Section RC.
-    Local Open Scope nat_scope.
-    Inductive nati := n (n:nat) | inf.
-    Coercion n : nat >-> nati.
+Section RC.
+  Local Open Scope nat_scope.
+  Inductive resources := rb (l:nati) (u:nati).
 
-    Definition nati_le (a b:nati) : Prop :=
+  Definition resources_le (b a:resources) : Prop :=
+    match b, a with
+    | rb bl bu, rb al au =>
+      (al <= bl /\ bu <= au)%nati
+    end.
+
+  Declare Scope resources_scope.
+  Delimit Scope resources_scope with resources.
+  Notation "a <= b" := (resources_le a b) : resources_scope.
+  (* Bind Scope resources_scope with resources. *)
+
+  Lemma resources_largest : forall r, (r <= (rb 0 inf))%resources.
+  Proof.
+    rewrite /resources_le => r.
+    destruct r.
+    rewrite /nati_le.
+    split.
+    destruct l; intuition lia.
+    destruct u; intuition lia.
+  Qed.
+
+  (* executions allowed by a can be decomposed into executions requiring b,
+    followed by executions requiring c.
+    informally, like a - b = c *)
+  Definition resources_split (a b c:resources) : Prop :=
+    match a, b, c with
+    | rb al au, rb bl bu, rb cl cu =>
+      (* cannot take more resources than available *)
+      (bu <= au ->
+      (* could lead to cl > cu *)
+      al + bu <= au + bl ->
+      (* these conditions ensure that c is the largest resource consumption *)
+      (forall x, x + bl >= al -> cl <= x) /\ (* minimality *)
+      (forall x, x + bu <= au -> cu >= x) /\ (* maximality *)
+      (* ub must be less (as we can't take more than is available),
+        lb must be greater (as we must consume as least as much as required) *)
+      cl + bl >= al /\ cu + bu <= au)%nati
+    end.
+  (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
+
+  Section Constructive.
+
+    Definition nati_min_minus (a b:nati) : nati :=
       match a, b with
-      | n a, n b => (a<=b)%nat
-      | n _, inf => True
-      | inf, n _ => False
-      | inf, inf => True
+      | n a, n b => n (a-b)%nat
+      | n _, inf => 0
+      | inf, n _ => inf
+      | inf, inf => 0
       end.
 
-    Definition nati_plus (a b:nati) : nati :=
+    Definition nati_max_minus (a b:nati) : nati :=
       match a, b with
-      | n a, n b => n (a+b)%nat
-      | n _, inf => inf
+      | n a, n b => n (a-b)%nat
+      | n _, inf => 0
       | inf, n _ => inf
       | inf, inf => inf
       end.
 
-    Declare Scope nati_scope.
-    Delimit Scope nati_scope with nati.
-    Notation "x <= y" := (nati_le x y) : nati_scope.
-    Notation "x >= y" := (nati_le y x) : nati_scope.
-    Notation "x > y" := (nati_le y x /\ y <> x) : nati_scope.
-    Notation "x + y" := (nati_plus x y) : nati_scope.
-    Bind Scope nati_scope with nati.
-
-    Inductive resources := rb (l:nati) (u:nati).
-
-    Definition resources_le (b a:resources) : Prop :=
-      match b, a with
-      | rb bl bu, rb al au =>
-        (al <= bl /\ bu <= au)%nati
-      end.
-
-    Declare Scope resources_scope.
-    Delimit Scope resources_scope with resources.
-    Notation "a <= b" := (resources_le a b) : resources_scope.
-    (* Bind Scope resources_scope with resources. *)
-
-    Lemma resources_largest : forall r, (r <= (rb 0 inf))%resources.
-    Proof.
-      rewrite /resources_le => r.
-      destruct r.
-      rewrite /nati_le.
-      split.
-      destruct l; intuition lia.
-      destruct u; intuition lia.
-    Qed.
-
-    (* executions allowed by a can be decomposed into executions requiring b,
-      followed by executions requiring c.
-      informally, like a - b = c *)
-    Definition resources_split (a b c:resources) : Prop :=
+    Definition resources_split_constr (a b c:resources) : Prop :=
       match a, b, c with
       | rb al au, rb bl bu, rb cl cu =>
         (* cannot take more resources than available *)
         (bu <= au ->
-        (* could lead to cl > cu *)
+        (* lead to cl > cu *)
         al + bu <= au + bl ->
-        (* these conditions ensure that c is the largest resource consumption *)
-        (forall xi, xi + bl >= al -> cl <= xi) -> (* minimality *)
-        (forall xi, xi + bu >= au -> xi <= cu) -> (* maximality *)
-        (* ub must be less (as we can't take more than is available),
-          lb must be greater (as we must consume as least as much as required) *)
-        cl + bl >= al /\ cu + bu <= au)%nati
+          cl = nati_min_minus al bl /\ cu = nati_max_minus au bu
+        )%nati
+          (* match al, au, bl, bu with
+          | n al, n au, n bl, n bu => cl = al - bl /\ cu = au - bu
+          | n al, n au, n bl, inf => False (* first condition *)
+          | n al, n au, inf, n bu => False (* not wf *)
+          | n al, n au, inf, inf => False (* first condition *)
+          | n al, inf, n bl, n bu => cl = al - bl /\ cu = inf
+          | n al, inf, n bl, inf => cl = al - bl /\ cu = inf
+          | n al, inf, inf, n bu => False (* not wf *)
+          | n al, inf, inf, inf => cl = inf /\ cu = inf
+          | inf, n au, n bl, n bu => False (* not wf *)
+          | inf, n au, n bl, inf => False (* not wf *)
+          | inf, n au, inf, n bu => False (* not wf *)
+          | inf, n au, inf, inf => False (* not wf *)
+          | inf, inf, n bl, n bu => cl = inf /\ cu = inf
+          | inf, inf, n bl, inf => cl = inf /\ cu = inf
+          | inf, inf, inf, n bu => False (* not wf *)
+          | inf, inf, inf, inf => cl = 0 /\ cu = inf
+          end)%nati *)
       end.
-    (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
 
-    Section Constructive.
-
-      Definition nati_min_minus (a b:nati) : nati :=
-        match a, b with
-        | n a, n b => n (a-b)%nat
-        | n _, inf => 0
-        | inf, n _ => inf
-        | inf, inf => 0
-        end.
-
-      Definition nati_max_minus (a b:nati) : nati :=
-        match a, b with
-        | n a, n b => n (a-b)%nat
-        | n _, inf => 0
-        | inf, n _ => inf
-        | inf, inf => inf
-        end.
-
-      Definition resources_split_constr (a b c:resources) : Prop :=
-        match a, b, c with
-        | rb al au, rb bl bu, rb cl cu =>
-          (* cannot take more resources than available *)
-          (bu <= au ->
-          (* lead to cl > cu *)
-          al + bu <= au + bl ->
-            cl = nati_min_minus al bl /\ cu = nati_max_minus au bu
-          )%nati
-            (* match al, au, bl, bu with
-            | n al, n au, n bl, n bu => cl = al - bl /\ cu = au - bu
-            | n al, n au, n bl, inf => False (* first condition *)
-            | n al, n au, inf, n bu => False (* not wf *)
-            | n al, n au, inf, inf => False (* first condition *)
-            | n al, inf, n bl, n bu => cl = al - bl /\ cu = inf
-            | n al, inf, n bl, inf => cl = al - bl /\ cu = inf
-            | n al, inf, inf, n bu => False (* not wf *)
-            | n al, inf, inf, inf => cl = inf /\ cu = inf
-            | inf, n au, n bl, n bu => False (* not wf *)
-            | inf, n au, n bl, inf => False (* not wf *)
-            | inf, n au, inf, n bu => False (* not wf *)
-            | inf, n au, inf, inf => False (* not wf *)
-            | inf, inf, n bl, n bu => cl = inf /\ cu = inf
-            | inf, inf, n bl, inf => cl = inf /\ cu = inf
-            | inf, inf, inf, n bu => False (* not wf *)
-            | inf, inf, inf, inf => cl = 0 /\ cu = inf
-            end)%nati *)
-        end.
-
-      (* Lemma aaa : forall a b c,
-        (forall x : nati, (x + b >= a)%nati -> (x >= c)%nati)
-        /\ (c + b >= a)%nati
-        <->
-        c = nati_min_minus a b.
-      Proof.
-        intros.
-        split; intros.
-        - 
-          destruct H.
-          unfold nati_min_minus.
-          destruct a.
-          destruct b.
-          destruct c.
-          unfold nati_plus in H0.
-          unfold nati_le in H0.
-          inversion H0.
-          + rewrite Nat.add_sub.
-          reflexivity.
-          + 
-
-          Search ((_ + _) - _).
-          (* rewrite Nat.add *)
-          Print Init.Nat.sub.
-          Unset Printing Notations.
-          simpl.
-          lia.
-          simpl.
-
-          Unset Printing Coercions.
-          rewrite <- H0.
-
-          lia.
-          (* rewrite <- H0. *)
-          
-          (* 
-          (* specialize (H l1). *)
-          unfold nati_plus in H0.
-          destruct l1.
-          admit.
-          rewrite H0.
-          Unset Printing Notations. *)
-          (* rewrite <- H0.
-          lia.
-          rewrite <- H0.
-          lia.
-          rewrite <- H0.
-
-          lia. *)
-        admit.
-        - admit.
-      Admitted. *)
-
-
-      Lemma resources_split_equiv : forall a b c,
-        resources_split a b c <-> resources_split_constr a b c.
-      Proof.
-        split; intros.
-        - unfold resources_split in H; destruct a; destruct b; destruct c.
-          unfold resources_split_constr; destruct l; destruct u; destruct l0; destruct u0.
-          intros.
-          split.
-          +
-          forward H by auto.
-          forward H by auto.
-          forward H.
-          destruct xi.
-          induction n4.
-      Abort.
-    End Constructive.
-
-    Section Examples.
-      Example e1_split : resources_split
-        (rb 0 3) (rb 0 2) (rb 0 1).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-
-      (* cannot take more than available *)
-      Example e1_split_f : resources_split
-        (rb 0 3) (rb 0 2) (rb 0 2).
-      Proof. unfold resources_split. intros. simpl. Fail lia. Abort.
-
-      (* given inf, we can have as much remaining as we want *)
-      Example e2_split : resources_split
-        (rb 0 inf) (rb 0 2) (rb 0 4).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-
-      Example e3_split : resources_split
-        (rb 0 inf) (rb 0 2) (rb 0 inf).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-
-      (* or as little *)
-      Example e5_split : resources_split
-        (rb 0 inf) (rb 0 2) (rb 0 1).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-
-      Example e6_split : resources_split
-        (rb 0 inf) (rb 0 inf) (rb 0 0).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-
-      (* we can even extract inf and have inf remaining *)
-      Example e4_split : resources_split
-        (rb 0 inf) (rb 0 inf) (rb 0 inf).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-
-      (* or nothing *)
-      Example e7_split : resources_split
-        (rb 0 inf) (rb 0 inf) (rb 0 0).
-      Proof. unfold resources_split. intros. simpl. lia. Qed.
-    End Examples.
-
-    (* Lemma resources_split_undefined : forall a b c al au bl bu,
-      a = rb al au ->
-      b = rb bl bu ->
-      (bu > au)%nati ->
-      not (resources_split a b c).
+    (* Lemma aaa : forall a b c,
+      (forall x : nati, (x + b >= a)%nati -> (x >= c)%nati)
+      /\ (c + b >= a)%nati
+      <->
+      c = nati_min_minus a b.
     Proof.
-      unfold not; intros; subst.
-      destruct H1.
-      apply: H0.
+      intros.
+      split; intros.
+      - 
+        destruct H.
+        unfold nati_min_minus.
+        destruct a.
+        destruct b.
+        destruct c.
+        unfold nati_plus in H0.
+        unfold nati_le in H0.
+        inversion H0.
+        + rewrite Nat.add_sub.
+        reflexivity.
+        + 
 
-      unfold resources_split in H2; destruct c.
+        Search ((_ + _) - _).
+        (* rewrite Nat.add *)
+        Print Init.Nat.sub.
+        Unset Printing Notations.
+        simpl.
+        lia.
+        simpl.
 
-      unfold nati_le in H.
-      destruct au.
-      destruct bu.
-      induction H.
-      - reflexivity.
-      -
+        Unset Printing Coercions.
+        rewrite <- H0.
 
-      destruct au.
-      destruct bu.
-      f_equal.
+        lia.
+        (* rewrite <- H0. *)
+        
+        (* 
+        (* specialize (H l1). *)
+        unfold nati_plus in H0.
+        destruct l1.
+        admit.
+        rewrite H0.
+        Unset Printing Notations. *)
+        (* rewrite <- H0.
+        lia.
+        rewrite <- H0.
+        lia.
+        rewrite <- H0.
+
+        lia. *)
+      admit.
+      - admit.
     Admitted. *)
 
-    Definition rc_assert := resources -> Prop.
-    Definition rc (l:nati) (u:nati) : rc_assert :=
-      fun r =>
-        match r with | rb ml mu => ml = l /\ mu = u end.
 
-    Definition mayloop := rc 0 inf.
-    Definition loop := rc inf inf.
-    Definition term x := rc 0 x. (* TODO *)
-
-    Definition rc_entail (a b:rc_assert) : Prop :=
-      forall r, a r -> b r.
-    Definition rc_and (a b:rc_assert) : rc_assert :=
-      fun r => a r /\ b r.
-    Definition rc_equiv (a b:rc_assert) : Prop :=
-      forall r, a r <-> b r.
-    Definition rc_false : rc_assert := fun r => False.
-
-    (* triangle *)
-    Definition rc_split (a b:rc_assert) : rc_assert := fun r =>
-      forall r1 r2,
-      resources_split r r1 r2 ->
-      a r1 /\ b r2.
-
-    Definition rc_entail_frame (a b c:rc_assert) : Prop :=
-      rc_entail a (rc_split b c).
-
-    Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
+    Lemma resources_split_equiv : forall a b c,
+      resources_split a b c <-> resources_split_constr a b c.
     Proof.
-      unfold rc_entail_frame.
-      unfold rc_entail.
-      unfold rc_split.
-      intros.
-      split.
-      unfold resources_split in H0.
-      destruct r.
-      destruct r1.
-      destruct r2.
-      (* TODO *)
-    Abort.
-
-    Lemma rc_eq : forall al au bl bu,
-      rc_entail (rc al au) (rc bl bu) <->
-      al = bl /\ au = bu.
-    Proof.
-      intros.
-      split.
-      - intros. unfold rc_entail in H. unfold rc in H. specialize (H (rb al au)).
-        simpl in H.
-        now apply H.
-      - intros. destruct H. subst. unfold rc_entail. intros. assumption.
-    Qed.
-
-    Lemma rc_eq1 : forall al au bl bu,
-      (rc_equiv (rc_and (rc al au) (rc bl bu)) (rc al au)) <->
-      al = bl /\ au = bu.
-    Proof.
-      move=> al au bl bu.
       split; intros.
-      - unfold rc_equiv in H.
-      unfold rc_and in H.
-      unfold rc in H.
-      specialize (H (rb al au)).
-      destruct H.
-      forward H0 by intuition.
-      destruct H0.
-      auto.
-      - destruct H.
-      unfold rc_equiv.
-      unfold rc_and.
-      unfold rc.
-      subst.
-      intros.
-      intuition.
-    Qed.
+      - unfold resources_split in H; destruct a; destruct b; destruct c.
+        unfold resources_split_constr; destruct l; destruct u; destruct l0; destruct u0.
+        intros.
+        split.
+        +
+        forward H by auto.
+        forward H by auto.
+        destruct H.
+        destruct H2.
+        (* destruct xi. *)
+        (* induction n4. *)
+    Abort.
+  End Constructive.
 
-    Lemma rc_contradiction : forall al au bl bu,
-      al <> bl \/ au <> bu ->
-        rc_equiv (rc_and (rc al au) (rc bl bu)) rc_false.
+  Section Examples.
+
+    Lemma nati_leq_move : forall a b c,
+      (c > 0)%nat ->
+      (a + S b <= n c <-> a + b <= Nat.pred c)%nati.
     Proof.
-      move=> al au bl bu.
-      case=>[H|H].
-      - rewrite /rc_equiv /rc_and /rc /rc_false => r.
-      intuition.
-      destruct r.
-      (* move: H1 H2 => [? ?] [? ?]. *)
-      destruct H1; destruct H2.
-      congruence.
-      - rewrite /rc_equiv /rc_and /rc /rc_false => r.
-      destruct r.
-      intuition.
-      congruence.
+    destruct a.
+    - induction n.
+      + simpl; split; lia.
+      + 
+      split; intros.
+      --
+      simpl in H0.
+      simpl.
+      rewrite plus_n_Sm.
+      apply (IHn _ c). auto.
+      simpl.
+      rewrite plus_n_Sm in H0.
+      assumption.
+      --
+      simpl.
+      rewrite plus_n_Sm.
+      apply IHn. assumption.
+      simpl in H0.
+      rewrite plus_n_Sm in H0.
+      assumption.
+    - intuition.
+
+      (* unfold Nat.pred.
+      lia.
+      now auto.
+      simpl; now apply Le.le_Sn_le_stt.
+
+      intros.
+      inversion H.
+      rewrite (Nat.lt_succ_pred (Nat.pred b)); auto.
+      unfold lt. *)
+      
+      (* Search (_ = Nat.pred _ -> Nat.pred _ < _). *)
+(* 
+      rewrite H0.
+      unfold lt.
+      simpl.
+      apply Arith_prebase.lt_pred_n_n_stt.
+
+      Search (Nat.pred _ < _).
+      Search (S (Nat.pred _)). *)
+
+      (* Search (_ <= _ -> _ <= _). *)
+      (* nowsimpl. *)
+    (* simpl.
+      simpl.
+        admit.
+      + admit. *)
+      (* induction b; intros.
+      - 
+      unfold nati_le.
+      rewrite nati_plus_0.
+      (* destruct (a+1)%nati. *)
+      destruct a.
+      +
+        simpl.
+      admit. *)
+
     Qed.
 
-    (* Inductive rea := Term | MayLoop | Loop. *)
-    (* resource assertion *)
+    Lemma geq_succ : forall m n, n > S m -> n > 0.
+    Proof.
+      lia.
+    Qed.
 
-  End RC.
+    Lemma nati_plus_leq : forall a b c,
+      (c > b)%nat -> (a + n b <= n c <-> a <= c - b)%nati.
+    Proof.
+      induction b; intros.
+      - rewrite nati_plus_0.
+        rewrite Nat.sub_0_r.
+        intuition.
+      -
+      (* Search (_ > S _ -> _ > 0). *)
+      pose proof (geq_succ _ _ H).
+
+      (* assert (forall a b c, (c > 0)%nat -> (a + S b <= n c <-> a + b <= Nat.pred c))%nati. admit. *)
+      assert (forall b c, (c > 0)%nat -> (c - S b = Nat.pred c - b))%nati. lia.
+      rewrite nati_leq_move; auto.
+      rewrite H1; auto.
+      apply IHb.
+      lia.
+    Qed.
+
+    Example e1_split : resources_split
+      (rb 0 3) (rb 0 2) (rb 0 1).
+    Proof. unfold resources_split. intros. intuition.
+    - now rewrite nati_plus_0 in H1.
+    -
+      (* assert (forall a b c, a + n b <= n c <-> a <= c - b)%nati. admit. *)
+      rewrite nati_plus_leq in H1.
+      lia.
+      simpl in H1.
+      assumption.
+    - now simpl.
+    - now simpl.
+    Qed.
+    (* simpl. lia. Qed. *)
+
+    (* cannot take more than available *)
+    Example e1_split_f : resources_split
+      (rb 0 3) (rb 0 2) (rb 0 2).
+    Proof. unfold resources_split. intros. simpl. Fail lia. Abort.
+
+    (* given inf, we can have as much remaining as we want *)
+    Example e2_split : resources_split
+      (rb 0 inf) (rb 0 2) (rb 0 4).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e3_split : resources_split
+      (rb 0 inf) (rb 0 2) (rb 0 inf).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    (* or as little *)
+    Example e5_split : resources_split
+      (rb 0 inf) (rb 0 2) (rb 0 1).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    Example e6_split : resources_split
+      (rb 0 inf) (rb 0 inf) (rb 0 0).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    (* we can even extract inf and have inf remaining *)
+    Example e4_split : resources_split
+      (rb 0 inf) (rb 0 inf) (rb 0 inf).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+
+    (* or nothing *)
+    Example e7_split : resources_split
+      (rb 0 inf) (rb 0 inf) (rb 0 0).
+    Proof. unfold resources_split. intros. simpl. lia. Qed.
+  End Examples.
+
+  (* Lemma resources_split_undefined : forall a b c al au bl bu,
+    a = rb al au ->
+    b = rb bl bu ->
+    (bu > au)%nati ->
+    not (resources_split a b c).
+  Proof.
+    unfold not; intros; subst.
+    destruct H1.
+    apply: H0.
+
+    unfold resources_split in H2; destruct c.
+
+    unfold nati_le in H.
+    destruct au.
+    destruct bu.
+    induction H.
+    - reflexivity.
+    -
+
+    destruct au.
+    destruct bu.
+    f_equal.
+  Admitted. *)
+
+  Definition rc_assert := resources -> Prop.
+  Definition rc (l:nati) (u:nati) : rc_assert :=
+    fun r =>
+      match r with | rb ml mu => ml = l /\ mu = u end.
+
+  Definition mayloop := rc 0 inf.
+  Definition loop := rc inf inf.
+  Definition term x := rc 0 x. (* TODO *)
+
+  Definition rc_entail (a b:rc_assert) : Prop :=
+    forall r, a r -> b r.
+  Definition rc_and (a b:rc_assert) : rc_assert :=
+    fun r => a r /\ b r.
+  Definition rc_equiv (a b:rc_assert) : Prop :=
+    forall r, a r <-> b r.
+  Definition rc_false : rc_assert := fun r => False.
+
+  (* triangle *)
+  Definition rc_split (a b:rc_assert) : rc_assert := fun r =>
+    forall r1 r2,
+    resources_split r r1 r2 ->
+    a r1 /\ b r2.
+
+  Definition rc_entail_frame (a b c:rc_assert) : Prop :=
+    rc_entail a (rc_split b c).
+
+  Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
+  Proof.
+    unfold rc_entail_frame.
+    unfold rc_entail.
+    unfold rc_split.
+    intros.
+    split.
+    unfold resources_split in H0.
+    destruct r.
+    destruct r1.
+    destruct r2.
+    (* TODO *)
+  Abort.
+
+  Lemma rc_eq : forall al au bl bu,
+    rc_entail (rc al au) (rc bl bu) <->
+    al = bl /\ au = bu.
+  Proof.
+    intros.
+    split.
+    - intros. unfold rc_entail in H. unfold rc in H. specialize (H (rb al au)).
+      simpl in H.
+      now apply H.
+    - intros. destruct H. subst. unfold rc_entail. intros. assumption.
+  Qed.
+
+  Lemma rc_eq1 : forall al au bl bu,
+    (rc_equiv (rc_and (rc al au) (rc bl bu)) (rc al au)) <->
+    al = bl /\ au = bu.
+  Proof.
+    move=> al au bl bu.
+    split; intros.
+    - unfold rc_equiv in H.
+    unfold rc_and in H.
+    unfold rc in H.
+    specialize (H (rb al au)).
+    destruct H.
+    forward H0 by intuition.
+    destruct H0.
+    auto.
+    - destruct H.
+    unfold rc_equiv.
+    unfold rc_and.
+    unfold rc.
+    subst.
+    intros.
+    intuition.
+  Qed.
+
+  Lemma rc_contradiction : forall al au bl bu,
+    al <> bl \/ au <> bu ->
+      rc_equiv (rc_and (rc al au) (rc bl bu)) rc_false.
+  Proof.
+    move=> al au bl bu.
+    case=>[H|H].
+    - rewrite /rc_equiv /rc_and /rc /rc_false => r.
+    intuition.
+    destruct r.
+    (* move: H1 H2 => [? ?] [? ?]. *)
+    destruct H1; destruct H2.
+    congruence.
+    - rewrite /rc_equiv /rc_and /rc /rc_false => r.
+    destruct r.
+    intuition.
+    congruence.
+  Qed.
+
+  (* Inductive rea := Term | MayLoop | Loop. *)
+  (* resource assertion *)
+
+End RC.
 
 Definition val := Z.
 (* Inductive val := int (i:Z) | ni (n:nati). *)
