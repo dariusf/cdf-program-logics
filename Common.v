@@ -212,13 +212,13 @@ Proof.
 Qed.
 
 
-Lemma geq_succ : forall m n, n > S m -> n > 0.
+Lemma geq_succ : forall m n, n >= S m -> n > 0.
 Proof.
   lia.
 Qed.
 
 Lemma nati_plus_le : forall a b c,
-  (c > b)%nat -> (a + n b <= n c <-> a <= c - b)%nati.
+  (c >= b)%nat -> (a + n b <= n c <-> a <= c - b)%nati.
 Proof.
   induction b; intros.
   - rewrite nati_plus_0.
@@ -233,7 +233,7 @@ Proof.
 Qed.
 
 Lemma nati_plus_ge : forall a b c,
-  (c > b)%nat -> (a + n b >= n c <-> a >= c - b)%nati.
+  (c >= b)%nat -> (a + n b >= n c <-> a >= c - b)%nati.
 Proof.
   induction b; intros.
   - rewrite nati_plus_0.

@@ -373,6 +373,71 @@ Section RC.
     - now simpl in *.
   Qed.
 
+  Lemma aa2 : forall (c b a:nati),
+    (a >= b)%nati ->
+    (forall x, (a <= x + b)%nati -> (c <= x)%nati) ->
+    (a <= c + b)%nati ->
+    c = nati_min_minus a b.
+  Proof.
+    intros c b a H H0 H1.
+    unfold nati_min_minus.
+    destruct a as [na|]; destruct b as [nb|]; destruct c as [nc|].
+    - (* show that it's also bounded from above by na-nb *)
+    specialize (H0 (na - nb)).
+    rewrite nati_plus_ge in H1.
+    unfold nati_le in H.
+    unfold ge.
+    assumption.
+    + forward H0 by simpl; lia.
+    pose proof (nati_le_antisymm (na-nb) nc H1 H0).
+    symmetry. easy.
+
+    - simpl in *.
+    specialize (H0 na).
+    simpl in H0.
+    forward H0. lia. easy.
+    (* vacuously true as inf isn't smallest *)
+    - now simpl in *.
+    - now simpl in *.
+    - now simpl in *.
+    - now simpl in *.
+    - simpl in *.
+    specialize (H0 0).
+    simpl in *.
+    forward H0 by easy.
+    inversion H0.
+    easy.
+    - simpl in *.
+    specialize (H0 0).
+    simpl in *.
+    easy.
+  Qed.
+
+  Lemma l2 : rc_entail_frame loop loop mayloop.
+  Proof.
+    unfold rc_entail_frame.
+    unfold rc_entail.
+    unfold rc_split.
+    intros.
+    unfold resources_split in H0. destruct r. destruct r1. destruct r2.
+    destruct H.
+    subst.
+    forward H0 by unfold nati_le; destruct u0; easy.
+    forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
+    destruct H0 as [Hmin [Hmax [Hl Hu]]].
+
+    assert (forall a, inf <= a -> a = inf)%nati. admit.
+    assert (forall a, a <= inf)%nati. admit.
+    pose proof (H (l1 + l0)%nati Hl).
+    simpl in H0.
+    (* assert (forall a, inf <= a -> a = inf)%nati. admit. *)
+
+    (* rewrite H in Hl. *)
+
+    (* simpl in Hl. *)
+
+    pose proof (aa2 _ _ _ (H0 l1) Hmin Hl).
+  Qed.
 
   Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
   Proof.
@@ -387,14 +452,27 @@ Section RC.
     forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
     destruct H0 as [Hmin [Hmax [Hl Hu]]].
 
-    specialize (Hmin 0).
-    simpl in Hmin.
-    destruct l0.
+    (* specialize (Hmin 0). *)
+    (* simpl in Hmin. *)
+    (* destruct l0. *)
 
     unfold mayloop.
     unfold rc.
+
+    assert (l0 <= 0)%nati.
+    unfold nati_le.
+
+    admit.
+    pose proof (aa2 _ _ _ H Hmin Hl).
+    simpl in H0.
+    destruct l0.
+    subst.
+    simpl in *.
+
     intuition.
-    specialize (Hmin l0).
+    (* specialize (Hmin l0). *)
+    (* apply aa1. *)
+
 
     split.
     (* TODO *)
