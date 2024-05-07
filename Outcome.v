@@ -96,20 +96,43 @@ Section RC.
 
   Section Constructive.
 
-    Definition nati_min_minus (a b:nati) : nati :=
-      match a, b with
-      | n a, n b => n (a-b)%nat
-      | n _, inf => 0
-      | inf, n _ => inf
+    (* min such that lower bound, i.e. min{x | x + b <= a} *)
+    Definition min_st_lb (b a:nati) : nati :=
+      match b, a with
+      | n b, n a => n (a-b)%nat
+      | n _, inf => inf
+      | inf, n _ => 0
       | inf, inf => 0
       end.
 
-    Definition nati_max_minus (a b:nati) : nati :=
-      match a, b with
-      | n a, n b => n (a-b)%nat
-      | n _, inf => 0
-      | inf, n _ => inf
-      | inf, inf => inf
+    (* c via the constructive defn is indeed minimal *)
+    Lemma min_st_lb_minimal : forall a b c,
+      c = min_st_lb b a -> (forall x, x + b >= a -> c <= x)%nati.
+    Proof.
+      intros.
+      unfolds in H.
+      destruct b as [nb|]; destruct a as [na|].
+      - destruct x as [nx|]. destruct c as [nc|].
+        + simpl in *.
+          injection H; clear H; intros H.
+          lia.
+        + inv H.
+        + apply inf_greatest.
+      - rewrite H.
+        rewrite is_inf.
+        rewrite nati_n_ge_inf in H0.
+        easy.
+      - subst. destruct x; simpl; lia.
+      - subst. destruct x; simpl; lia.
+    Qed.
+
+    (* max such that upper bound, i.e. max{x | x + b >= a} *)
+    Definition max_st_ub (b a:nati) : option nati :=
+      match b, a with
+      | n b, n a => Some (n (a-b)%nat)
+      | n _, inf => Some inf
+      | inf, n _ => None
+      | inf, inf => Some (n 0)
       end.
 
     Definition resources_split_constr (a b c:resources) : Prop :=
@@ -117,107 +140,30 @@ Section RC.
       | rb al au, rb bl bu, rb cl cu =>
         (* cannot take more resources than available *)
         (bu <= au ->
-        (* lead to cl > cu *)
+        (* could lead to cl > cu *)
         al + bu <= au + bl ->
-          cl = nati_min_minus al bl /\ cu = nati_max_minus au bu
+          cl = min_st_lb bl al /\ Some cu = max_st_ub bu au
         )%nati
-          (* match al, au, bl, bu with
-          | n al, n au, n bl, n bu => cl = al - bl /\ cu = au - bu
-          | n al, n au, n bl, inf => False (* first condition *)
-          | n al, n au, inf, n bu => False (* not wf *)
-          | n al, n au, inf, inf => False (* first condition *)
-          | n al, inf, n bl, n bu => cl = al - bl /\ cu = inf
-          | n al, inf, n bl, inf => cl = al - bl /\ cu = inf
-          | n al, inf, inf, n bu => False (* not wf *)
-          | n al, inf, inf, inf => cl = inf /\ cu = inf
-          | inf, n au, n bl, n bu => False (* not wf *)
-          | inf, n au, n bl, inf => False (* not wf *)
-          | inf, n au, inf, n bu => False (* not wf *)
-          | inf, n au, inf, inf => False (* not wf *)
-          | inf, inf, n bl, n bu => cl = inf /\ cu = inf
-          | inf, inf, n bl, inf => cl = inf /\ cu = inf
-          | inf, inf, inf, n bu => False (* not wf *)
-          | inf, inf, inf, inf => cl = 0 /\ cu = inf
-          end)%nati *)
       end.
 
-    (* Lemma aaa : forall a b c,
-      (forall x : nati, (x + b >= a)%nati -> (x >= c)%nati)
-      /\ (c + b >= a)%nati
-      <->
-      c = nati_min_minus a b.
+    Lemma resources_split_equiv : forall a b c,
+      resources_split_constr a b c -> resources_split a b c.
     Proof.
       intros.
-      split; intros.
-      - 
-        destruct H.
-        unfold nati_min_minus.
-        destruct a.
-        destruct b.
-        destruct c.
-        unfold nati_plus in H0.
-        unfold nati_le in H0.
-        inversion H0.
-        + rewrite Nat.add_sub.
-        reflexivity.
-        + 
-
-        Search ((_ + _) - _).
-        (* rewrite Nat.add *)
-        Print Init.Nat.sub.
-        Unset Printing Notations.
-        simpl.
-        lia.
-        simpl.
-
-        Unset Printing Coercions.
-        rewrite <- H0.
-
-        lia.
-        (* rewrite <- H0. *)
-        
-        (* 
-        (* specialize (H l1). *)
-        unfold nati_plus in H0.
-        destruct l1.
-        admit.
-        rewrite H0.
-        Unset Printing Notations. *)
-        (* rewrite <- H0.
-        lia.
-        rewrite <- H0.
-        lia.
-        rewrite <- H0.
-
-        lia. *)
-      admit.
-      - admit.
-    Admitted.
- *)
-
-
-    Lemma resources_split_equiv : forall a b c,
-      resources_split a b c <-> resources_split_constr a b c.
-    Proof.
-      split; intros.
-      - destruct a. destruct b. destruct c.
-        unfold resources_split in H.
-        unfold resources_split_constr.
+      destruct a. destruct b. destruct c.
+        unfolds in H.
+        unfolds.
         intros.
         forward H by auto.
         forward H by auto.
-        destruct H as [Hmin [Hmax [Hl Hu]]].
-        split.
-        unfold nati_min_minus.
-        destruct l.
-        destruct l0.
-        rewrite nati_plus_ge in Hl.
-        (* TODO split should talk about how the lower bounds are related? *)
+        destruct H as [Hmin Hmax].
+        intuition.
+        -
+
         admit.
-        specialize (Hmin (n - n0)).
-        forward Hmin by simpl; lia.
-        pose proof (nati_le_antisymm _ _ Hl Hmin).
-        easy.
+        - admit.
+        - admit.
+        - admit.
     Abort.
   End Constructive.
 
@@ -334,7 +280,7 @@ Section RC.
     easy.
   Qed.
 
-  Lemma aa1 : forall (c b a:nati),
+  (* Lemma aa1 : forall (c b a:nati),
     (a > b)%nati ->
     (forall x, (a <= x + b)%nati -> (c <= x)%nati) ->
     (a <= c + b)%nati ->
@@ -404,13 +350,7 @@ Section RC.
     specialize (H0 0).
     simpl in *.
     easy.
-  Qed.
-
-  Lemma inf_greatest : forall a, (a <= inf)%nati.
-  Proof.
-    intros.
-    unfold nati_le. destruct a; easy.
-  Qed.
+  Qed. *)
 
   Lemma l2 : rc_entail_frame loop loop mayloop.
   Proof.
@@ -433,8 +373,8 @@ Section RC.
     (* how? *)
     (* assert (forall a, a <= inf)%nati. admit. *)
     pose proof (inf_greatest l0) as H0.
-    pose proof (aa2 _ _ _ H0 Hmin Hl) as H1.
-    simpl in H1.
+    (* pose proof (aa2 _ _ _ H0 Hmin Hl) as H1.
+    simpl in H1. *)
 
     destruct l0.
 
@@ -465,8 +405,8 @@ Section RC.
     unfold nati_le.
 
     admit.
-    pose proof (aa2 _ _ _ H Hmin Hl).
-    simpl in H0.
+    (* pose proof (aa2 _ _ _ H Hmin Hl). *)
+    (* simpl in H0. *)
     destruct l0.
     subst.
     simpl in *.

@@ -282,3 +282,27 @@ Proof.
   - easy.
   - easy.
 Qed.
+
+Lemma inf_greatest : forall a, (a <= inf)%nati.
+Proof.
+  intros.
+  unfold nati_le. destruct a; easy.
+Qed.
+
+Lemma inf_inf : forall a,
+  ~ (inf = n a).
+Proof.
+  unfold not; intros.
+  inversion H.
+Qed.
+
+Lemma is_inf : forall a, (a >= inf)%nati <-> a = inf.
+Proof.
+  destruct a; easy.
+Qed.
+
+Lemma nati_n_ge_inf : forall (a:nati) (n:nat),
+  (a + n >= inf <-> a = inf)%nati.
+Proof.
+  destruct a; easy.
+Qed.
