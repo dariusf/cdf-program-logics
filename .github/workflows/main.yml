@@ -18,10 +18,11 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          # - macos-latest
           - ubuntu-latest
-        ocaml-compiler:
-          - 4.14.1
+        coq_version:
+          - "8.18.0"
+        ocaml_version:
+          - "4.14.1-flambda"
 
     runs-on: ${{ matrix.os }}
 
@@ -29,36 +30,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Use OCaml ${{ matrix.ocaml-compiler }}
-        uses: ocaml/setup-ocaml@v2
+      - uses: coq-community/docker-coq-action@v1
         with:
-          ocaml-compiler: ${{ matrix.ocaml-compiler }}
-          opam-pin: false
-          opam-depext: false
+          coq_version: ${{ matrix.coq_version }}
+          ocaml_version: ${{ matrix.ocaml_version }}
 
-      - run: |
-          set -x
-          eval $(opam env)
-          opam install coq=8.18.0
-          coqtop -v
-          coqtop <<< 'From Coq Require Import ZArith.'
-          ocaml --version
-          opam --version
-          opam list
-          opam var
-          ls $(opam var prefix) || true
-          ls $(opam var prefix)/lib || true
-          ls $(opam var prefix)/lib/coq || true
-          ls $(opam var prefix)/lib/coq/theories || true
-          ls $(opam var prefix)/lib/coq/theories/Init || true
-          git clone https://github.com/xavierleroy/coq2html
-          cd coq2html
-          make
-          make install
-          cd -
-          rm -rf coq2html
-          make
-          make documentation
+          before_install: |
+            startGroup "Workaround permission issue"
+              sudo chown -R coq:coq . /usr/local
+            endGroup
+
+          # https://github.com/coq-community/docker-coq-action#permissions
+          install: |
+            git clone https://github.com/xavierleroy/coq2html
+            cd coq2html
+            make
+            make install
+            cd -
+            rm -rf coq2html
+
+          script: |
+            startGroup "Build project"
+              make
+              make documentation
+            endGroup
+
+      # why does this take so long?
+      # - name: Revert permissions
+      #   # to avoid a warning at cleanup time
+      #   if: ${{ always() }}
+      #   run: |
+      #     sudo chown -R 1001:116 . /usr/local
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
