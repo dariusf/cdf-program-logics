@@ -21,6 +21,35 @@ Ltac forward_gen H tac :=
 Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac).
 Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
 
+(* https://softwarefoundations.cis.upenn.edu/plf-current/LibTactics.html *)
+Ltac get_head E :=
+  match E with
+  | ?E' ?x => get_head E'
+  | _ => constr:(E)
+  end.
+
+Ltac apply_to_head_of E cont :=
+  let go E :=
+    let P := get_head E in cont P in
+  match E with
+  | forall _,_ => intros; apply_to_head_of E cont
+  | ?A = ?B => first [ go A | go B ]
+  | ?A => go A
+  end.
+Ltac unfolds_base :=
+  match goal with |- ?G =>
+   apply_to_head_of G ltac:(fun P => unfold P) end.
+
+Tactic Notation "unfolds" :=
+  unfolds_base.
+
+Ltac unfolds_in_base H :=
+  match type of H with ?G =>
+   apply_to_head_of G ltac:(fun P => unfold P in H) end.
+Tactic Notation "unfolds" "in" hyp(H) :=
+  unfolds_in_base H.
+
+
 Section RC.
   Local Open Scope nat_scope.
   Inductive resources := rb (l:nati) (u:nati).
@@ -413,6 +442,12 @@ Section RC.
     easy.
   Qed.
 
+  Lemma inf_greatest : forall a, (a <= inf)%nati.
+  Proof.
+    intros.
+    unfold nati_le. destruct a; easy.
+  Qed.
+
   Lemma l2 : rc_entail_frame loop loop mayloop.
   Proof.
     unfold rc_entail_frame.
@@ -426,18 +461,21 @@ Section RC.
     forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
     destruct H0 as [Hmin [Hmax [Hl Hu]]].
 
-    assert (forall a, inf <= a -> a = inf)%nati. admit.
-    assert (forall a, a <= inf)%nati. admit.
-    pose proof (H (l1 + l0)%nati Hl).
-    simpl in H0.
-    (* assert (forall a, inf <= a -> a = inf)%nati. admit. *)
+    (* we need to determine these values *)
+    unfold loop.
+    unfold mayloop.
+    unfold rc.
 
-    (* rewrite H in Hl. *)
+    (* how? *)
+    (* assert (forall a, a <= inf)%nati. admit. *)
+    pose proof (inf_greatest l0) as H0.
+    pose proof (aa2 _ _ _ H0 Hmin Hl) as H1.
+    simpl in H1.
 
-    (* simpl in Hl. *)
+    destruct l0.
 
-    pose proof (aa2 _ _ _ (H0 l1) Hmin Hl).
-  Qed.
+    admit. (* find contradiction if l0 is finite *)
+  Abort.
 
   Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
   Proof.
@@ -469,12 +507,12 @@ Section RC.
     subst.
     simpl in *.
 
-    intuition.
+    (* intuition. *)
     (* specialize (Hmin l0). *)
     (* apply aa1. *)
 
 
-    split.
+    (* split. *)
     (* TODO *)
   Abort.
 
