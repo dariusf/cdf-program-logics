@@ -267,3 +267,18 @@ Proof.
     + intros. simpl. split. easy. destruct m; easy.
   - simpl. split. easy. destruct m; easy.
 Qed.
+
+Lemma nati_le_antisymm : forall n m,
+  (n <= m -> m <= n -> n = m)%nati.
+Proof.
+  intros n m H1 H2.
+  unfold nati_le in H1.
+  unfold nati_le in H2.
+  destruct n; destruct m.
+  - f_equal.
+    apply Nat.le_antisymm.
+    auto. auto.
+  - easy.
+  - easy.
+  - easy.
+Qed.

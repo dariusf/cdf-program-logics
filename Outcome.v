@@ -196,21 +196,6 @@ Section RC.
  *)
 
 
-    Lemma nati_le_antisymm : forall n m,
-      (n <= m -> m <= n -> n = m)%nati.
-    Proof.
-      intros n m H1 H2.
-      unfold nati_le in H1.
-      unfold nati_le in H2.
-      destruct n; destruct m.
-      - f_equal.
-        apply Nat.le_antisymm.
-        auto. auto.
-      - easy.
-      - easy.
-      - easy.
-    Qed.
-
     Lemma resources_split_equiv : forall a b c,
       resources_split a b c <-> resources_split_constr a b c.
     Proof.
@@ -307,30 +292,6 @@ Section RC.
     Abort.
 
   End Examples.
-
-  (* Lemma resources_split_undefined : forall a b c al au bl bu,
-    a = rb al au ->
-    b = rb bl bu ->
-    (bu > au)%nati ->
-    not (resources_split a b c).
-  Proof.
-    unfold not; intros; subst.
-    destruct H1.
-    apply: H0.
-
-    unfold resources_split in H2; destruct c.
-
-    unfold nati_le in H.
-    destruct au.
-    destruct bu.
-    induction H.
-    - reflexivity.
-    -
-
-    destruct au.
-    destruct bu.
-    f_equal.
-  Admitted. *)
 
   Definition rc_assert := resources -> Prop.
   Definition rc (l:nati) (u:nati) : rc_assert :=
