@@ -121,6 +121,11 @@ End Well_founded_Nat.
 
 Inductive nati := n (n:nat) | inf.
 
+Coercion n : nat >-> nati.
+Declare Scope nati_scope.
+Delimit Scope nati_scope with nati.
+Notation "∞" := inf : nati_scope.
+
 Definition nati_le (a b:nati) : Prop :=
   match a, b with
   | n a, n b => (a<=b)%nat
@@ -137,10 +142,6 @@ Definition nati_plus (a b:nati) : nati :=
   | inf, inf => inf
   end.
 
-Coercion n : nat >-> nati.
-
-Declare Scope nati_scope.
-Delimit Scope nati_scope with nati.
 Notation "x >= y" := (nati_le y x) : nati_scope.
 Notation "x > y" := (nati_le y x /\ y <> x) : nati_scope.
 Notation "x <= y" := (nati_le x y) : nati_scope.

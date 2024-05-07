@@ -358,6 +358,9 @@ Section RC.
   Definition rc_entail_frame (a b c:rc_assert) : Prop :=
     rc_entail a (rc_split b c).
 
+  (* \vdash \blacktriangleright *)
+  Notation "a ⊢ b ▶ c" := (rc_entail_frame a b c) (at level 100) : resources_scope.
+
   Lemma aa : forall l1 l0,
     (forall x : nati, (0 <= x + l0)%nati -> (l1 <= x)%nati) ->
     (0 <= l1 + l0)%nati.
