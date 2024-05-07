@@ -127,7 +127,7 @@ Section RC.
       al + bu <= au + bl ->
         cl = min_st_lb bl al /\ Some cu = max_st_ub bu au)%nati
     end.
-Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resources_scope.
+  (* Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resources_scope. *)
 
   (** The constructive definition is a refinement of the definition in the paper. *)
   Lemma resources_split_refine : forall a b c,
@@ -248,6 +248,7 @@ Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resour
       - apply inf_greatest.
     Qed.
 
+    (* this is an existential statement *)
     Example e9_split : resources_split_constr
       (rb inf inf) (rb inf inf) (rb 0 inf).
     Proof.
@@ -260,6 +261,20 @@ Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resour
       apply resources_split_refine.
       apply e9_split.
     Qed.
+
+    (* this is a forall statement *)
+    Example e11_split : forall bl bu cl cu,
+      resources_split_constr (rb inf inf) (rb bl bu) (rb cl cu) ->
+      bl = inf /\ bu = inf /\ cl = 0 /\ cu = inf.
+    Proof.
+      intros.
+      intuition.
+      unfolds in H.
+      forward H by apply inf_greatest.
+      forward H by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
+      destruct H.
+      unfolds in H.
+    Abort.
 
   End Examples.
 
@@ -312,10 +327,9 @@ Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resour
     unfold rc_entail.
     unfold rc_split.
     intros.
-    unfold resources_split_constr in H0.
     destruct r as [al au]. destruct r1 as [bl bu]. destruct r2 as [cl cu].
-    destruct H.
-    subst.
+    destruct H; subst.
+    unfold resources_split_constr in H0.
     forward H0 by unfolds; destruct bu; easy.
     forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
     destruct H0 as [Hl Hu].
