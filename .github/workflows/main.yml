@@ -1,0 +1,69 @@
+name: Main workflow
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Prime the caches every Monday
+    - cron: 0 1 * * MON
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          # - macos-latest
+          - ubuntu-latest
+        ocaml-compiler:
+          - 4.14.1
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Use OCaml ${{ matrix.ocaml-compiler }}
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-compiler }}
+          opam-pin: false
+          opam-depext: false
+
+      - run: |
+          set -x
+          eval $(opam env)
+          opam install coq=8.18.0
+          coqtop -v
+          coqtop <<< 'From Coq Require Import ZArith.'
+          ocaml --version
+          opam --version
+          opam list
+          opam var
+          ls $(opam var prefix) || true
+          ls $(opam var prefix)/lib || true
+          ls $(opam var prefix)/lib/coq || true
+          ls $(opam var prefix)/lib/coq/theories || true
+          ls $(opam var prefix)/lib/coq/theories/Init || true
+          git clone https://github.com/xavierleroy/coq2html
+          cd coq2html
+          make
+          make install
+          cd -
+          rm -rf coq2html
+          make
+          make documentation
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.ref == 'refs/heads/main'
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs
+          force_orphan: true

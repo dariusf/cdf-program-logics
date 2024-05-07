@@ -1,4 +1,4 @@
--R . CDF
+-Q . CDF
 Sequences.v
 Hoare.v
 Separation.v
