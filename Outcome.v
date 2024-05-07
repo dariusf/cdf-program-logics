@@ -107,7 +107,7 @@ Section RC.
 
     (* c via the constructive defn is indeed minimal *)
     Lemma min_st_lb_minimal : forall a b c,
-      c = min_st_lb b a -> (forall x, x + b >= a -> c <= x)%nati.
+      min_st_lb b a = c -> (forall x, x + b >= a -> c <= x)%nati.
     Proof.
       intros.
       unfolds in H.
@@ -118,7 +118,7 @@ Section RC.
           lia.
         + inv H.
         + apply inf_greatest.
-      - rewrite H.
+      - rewrite <- H.
         rewrite is_inf.
         rewrite nati_n_ge_inf in H0.
         easy.
@@ -132,8 +132,31 @@ Section RC.
       | n b, n a => Some (n (a-b)%nat)
       | n _, inf => Some inf
       | inf, n _ => None
-      | inf, inf => Some (n 0)
+      | inf, inf => Some inf
       end.
+
+    (* c via the constructive defn is indeed maximal *)
+    Lemma max_st_ub_maximal : forall a b c,
+      (b <= a)%nati ->
+      max_st_ub b a = Some c -> (forall x, x + b <= a -> c >= x)%nati.
+    Proof.
+      intros.
+      unfolds in H.
+      destruct b as [nb|]; destruct a as [na|].
+      - simpl in *.
+        injection H0; clear H0; intros H0.
+        rewrite <- H0.
+        apply (nati_plus_le x nb na); auto.
+      - simpl in H0.
+        injection H0; clear H0; intros H0.
+        subst.
+        apply inf_greatest.
+      - inv H.
+      - simpl in *.
+        injection H0; clear H0; intros H0.
+        subst.
+        apply inf_greatest.
+    Qed.
 
     Definition resources_split_constr (a b c:resources) : Prop :=
       match a, b, c with
@@ -142,8 +165,7 @@ Section RC.
         (bu <= au ->
         (* could lead to cl > cu *)
         al + bu <= au + bl ->
-          cl = min_st_lb bl al /\ Some cu = max_st_ub bu au
-        )%nati
+          cl = min_st_lb bl al /\ Some cu = max_st_ub bu au)%nati
       end.
 
     Lemma resources_split_equiv : forall a b c,
