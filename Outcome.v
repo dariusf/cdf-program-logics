@@ -298,7 +298,7 @@ Section RC.
   Definition rc_false : rc_assert := fun r => False.
 
   Definition rc_split (a b:rc_assert) : rc_assert := fun r =>
-    forall r1 r2,
+    exists r1 r2,
     resources_split_constr r r1 r2 ->
     a r1 /\ b r2.
   Notation "a ▶ b" := (rc_split a b) (at level 100) : resources_scope.
