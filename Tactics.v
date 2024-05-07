@@ -51,6 +51,7 @@ Ltac HUNION n :=
     end
   end.
 
+(* TODO try autorewrite *)
 Ltac heap := HUNION (3%nat); HDISJ; auto.
 
 (* Ltac rw := rewrite. *)

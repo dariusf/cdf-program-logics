@@ -56,119 +56,117 @@ Section RC.
     end.
   (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
 
-  Section Constructive.
 
-    (* min such that lower bound, i.e. min{x | x + b <= a} *)
-    Definition min_st_lb (b a:nati) : nati :=
-      match b, a with
-      | n b, n a => n (a-b)%nat
-      | n _, inf => inf
-      | inf, n _ => 0
-      | inf, inf => 0
-      end.
+  (* min such that lower bound, i.e. min{x | x + b <= a} *)
+  Definition min_st_lb (b a:nati) : nati :=
+    match b, a with
+    | n b, n a => n (a-b)%nat
+    | n _, inf => inf
+    | inf, n _ => 0
+    | inf, inf => 0
+    end.
 
-    (* c via the constructive defn is indeed minimal *)
-    Lemma min_st_lb_minimal : forall a b c,
-      min_st_lb b a = c -> (forall x, x + b >= a -> c <= x)%nati.
-    Proof.
-      intros.
-      unfolds in H.
-      destruct b as [nb|]; destruct a as [na|].
-      - destruct x as [nx|]. destruct c as [nc|].
-        + simpl in *.
-          inj H.
-          lia.
-        + inv H.
-        + apply inf_greatest.
-      - rewrite <- H.
-        rewrite is_inf.
-        rewrite nati_n_ge_inf in H0.
+  (* c via the constructive defn is indeed minimal *)
+  Lemma min_st_lb_minimal : forall a b c,
+    min_st_lb b a = c -> (forall x, x + b >= a -> c <= x)%nati.
+  Proof.
+    intros.
+    unfolds in H.
+    destruct b as [nb|]; destruct a as [na|].
+    - destruct x as [nx|]. destruct c as [nc|].
+      + simpl in *.
+        inj H.
+        lia.
+      + inv H.
+      + apply inf_greatest.
+    - rewrite <- H.
+      rewrite is_inf.
+      rewrite nati_n_ge_inf in H0.
+      easy.
+    - subst. destruct x; simpl; lia.
+    - subst. destruct x; simpl; lia.
+  Qed.
+
+  (* max such that upper bound, i.e. max{x | x + b >= a} *)
+  Definition max_st_ub (b a:nati) : option nati :=
+    match b, a with
+    | n b, n a => Some (n (a-b)%nat)
+    | n _, inf => Some inf
+    | inf, n _ => None
+    | inf, inf => Some inf
+    end.
+
+  (* c via the constructive defn is indeed maximal *)
+  Lemma max_st_ub_maximal : forall a b c,
+    (b <= a)%nati ->
+    max_st_ub b a = Some c -> (forall x, x + b <= a -> c >= x)%nati.
+  Proof.
+    intros.
+    unfolds in H.
+    destruct b as [nb|]; destruct a as [na|].
+    - simpl in *.
+      inj H0.
+      apply (nati_plus_le x nb na); auto.
+    - simpl in H0.
+      inj H0.
+      subst.
+      apply inf_greatest.
+    - inv H.
+    - simpl in *.
+      inj H0.
+      subst.
+      apply inf_greatest.
+  Qed.
+
+  Definition resources_split_constr (a b c:resources) : Prop :=
+    match a, b, c with
+    | rb al au, rb bl bu, rb cl cu =>
+      (* cannot take more resources than available *)
+      (bu <= au ->
+      (* could lead to cl > cu *)
+      al + bu <= au + bl ->
+        cl = min_st_lb bl al /\ Some cu = max_st_ub bu au)%nati
+    end.
+Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resources_scope.
+
+  (** The constructive definition is a refinement of the definition in the paper. *)
+  Lemma resources_split_refine : forall a b c,
+    resources_split_constr a b c -> resources_split a b c.
+  Proof.
+    intros.
+    destruct a. destruct b. destruct c.
+    unfolds in H.
+    unfolds.
+    intros.
+    forward H by auto.
+    forward H by auto.
+    destruct H as [Hmin Hmax].
+
+    intuition.
+    - intros.
+      pose proof (min_st_lb_minimal l l0 l1) as Hmin1.
+      forward Hmin1 by auto.
+      specialize (Hmin1 x H).
+      assumption.
+    - intros.
+      pose proof (max_st_ub_maximal u u0 u1) as Hmax1.
+      specialize (Hmax1 H0).
+      forward Hmax1 by auto.
+      specialize (Hmax1 x H).
+      assumption.
+    - rewrite Hmin.
+      destruct l0; destruct l; simpl in Hmin; simpl; try easy || lia.
+    - destruct u0; destruct u; simpl in Hmax.
+      + inj Hmax.
+        simpl.
+        simpl in H0.
+        rewrite Nat.sub_add; easy.
+      + inj Hmax.
         easy.
-      - subst. destruct x; simpl; lia.
-      - subst. destruct x; simpl; lia.
-    Qed.
-
-    (* max such that upper bound, i.e. max{x | x + b >= a} *)
-    Definition max_st_ub (b a:nati) : option nati :=
-      match b, a with
-      | n b, n a => Some (n (a-b)%nat)
-      | n _, inf => Some inf
-      | inf, n _ => None
-      | inf, inf => Some inf
-      end.
-
-    (* c via the constructive defn is indeed maximal *)
-    Lemma max_st_ub_maximal : forall a b c,
-      (b <= a)%nati ->
-      max_st_ub b a = Some c -> (forall x, x + b <= a -> c >= x)%nati.
-    Proof.
-      intros.
-      unfolds in H.
-      destruct b as [nb|]; destruct a as [na|].
-      - simpl in *.
-        inj H0.
-        apply (nati_plus_le x nb na); auto.
-      - simpl in H0.
-        inj H0.
-        subst.
-        apply inf_greatest.
-      - inv H.
-      - simpl in *.
-        inj H0.
-        subst.
-        apply inf_greatest.
-    Qed.
-
-    Definition resources_split_constr (a b c:resources) : Prop :=
-      match a, b, c with
-      | rb al au, rb bl bu, rb cl cu =>
-        (* cannot take more resources than available *)
-        (bu <= au ->
-        (* could lead to cl > cu *)
-        al + bu <= au + bl ->
-          cl = min_st_lb bl al /\ Some cu = max_st_ub bu au)%nati
-      end.
-
-    (** The constructive definition is a refinement of the definition in the paper. *)
-    Lemma resources_split_refine : forall a b c,
-      resources_split_constr a b c -> resources_split a b c.
-    Proof.
-      intros.
-      destruct a. destruct b. destruct c.
-      unfolds in H.
-      unfolds.
-      intros.
-      forward H by auto.
-      forward H by auto.
-      destruct H as [Hmin Hmax].
-
-      intuition.
-      - intros.
-        pose proof (min_st_lb_minimal l l0 l1) as Hmin1.
-        forward Hmin1 by auto.
-        specialize (Hmin1 x H).
-        assumption.
-      - intros.
-        pose proof (max_st_ub_maximal u u0 u1) as Hmax1.
-        specialize (Hmax1 H0).
-        forward Hmax1 by auto.
-        specialize (Hmax1 x H).
-        assumption.
-      - rewrite Hmin.
-        destruct l0; destruct l; simpl in Hmin; simpl; try easy || lia.
-      - destruct u0; destruct u; simpl in Hmax.
-        + inj Hmax.
-          simpl.
-          simpl in H0.
-          rewrite Nat.sub_add; easy.
-        + inj Hmax.
-          easy.
-        + inv Hmax.
-        + inj Hmax.
-          easy.
-    Qed.
-
-  End Constructive.
+      + inv Hmax.
+      + inj Hmax.
+        easy.
+  Qed.
 
   Section Examples.
 
@@ -253,17 +251,19 @@ Section RC.
 
   Definition rc_entail (a b:rc_assert) : Prop :=
     forall r, a r -> b r.
+  Notation "a ⊢ b" := (rc_entail a b) (at level 100) : resources_scope.
+
   Definition rc_and (a b:rc_assert) : rc_assert :=
     fun r => a r /\ b r.
   Definition rc_equiv (a b:rc_assert) : Prop :=
     forall r, a r <-> b r.
   Definition rc_false : rc_assert := fun r => False.
 
-  (* triangle *)
   Definition rc_split (a b:rc_assert) : rc_assert := fun r =>
     forall r1 r2,
-    resources_split r r1 r2 ->
+    resources_split_constr r r1 r2 ->
     a r1 /\ b r2.
+  Notation "a ▶ b" := (rc_split a b) (at level 100) : resources_scope.
 
   Definition rc_entail_frame (a b c:rc_assert) : Prop :=
     rc_entail a (rc_split b c).
@@ -283,90 +283,18 @@ Section RC.
     easy.
   Qed.
 
-  (* Lemma aa1 : forall (c b a:nati),
-    (a > b)%nati ->
-    (forall x, (a <= x + b)%nati -> (c <= x)%nati) ->
-    (a <= c + b)%nati ->
-    c = nati_min_minus a b.
-  Proof.
-    intros c b a H H0 H1.
-    unfold nati_min_minus.
-    destruct a as [na|]; destruct b as [nb|]; destruct c as [nc|].
-    - (* show that it's also bounded from above by na-nb *)
-    specialize (H0 (na - nb)).
-    rewrite nati_plus_ge in H1.
-    unfold nati_le in H. destruct H. inversion H.
-    + exfalso. apply H1. f_equal. easy.
-    + rewrite H3. inversion H2; lia.
-    + forward H0 by simpl; lia.
-    pose proof (nati_le_antisymm (na-nb) nc H1 H0).
-    symmetry. easy.
-
-    - simpl in *.
-    specialize (H0 na).
-    simpl in H0.
-    forward H0. lia. easy.
-    (* vacuously true as inf isn't smallest *)
-    - now simpl in *.
-    - now simpl in *.
-    - now simpl in *.
-    - now simpl in *.
-    - now simpl in *.
-    - now simpl in *.
-  Qed.
-
-  Lemma aa2 : forall (c b a:nati),
-    (a >= b)%nati ->
-    (forall x, (a <= x + b)%nati -> (c <= x)%nati) ->
-    (a <= c + b)%nati ->
-    c = nati_min_minus a b.
-  Proof.
-    intros c b a H H0 H1.
-    unfold nati_min_minus.
-    destruct a as [na|]; destruct b as [nb|]; destruct c as [nc|].
-    - (* show that it's also bounded from above by na-nb *)
-    specialize (H0 (na - nb)).
-    rewrite nati_plus_ge in H1.
-    unfold nati_le in H.
-    unfold ge.
-    assumption.
-    + forward H0 by simpl; lia.
-    pose proof (nati_le_antisymm (na-nb) nc H1 H0).
-    symmetry. easy.
-
-    - simpl in *.
-    specialize (H0 na).
-    simpl in H0.
-    forward H0. lia. easy.
-    (* vacuously true as inf isn't smallest *)
-    - now simpl in *.
-    - now simpl in *.
-    - now simpl in *.
-    - now simpl in *.
-    - simpl in *.
-    specialize (H0 0).
-    simpl in *.
-    forward H0 by easy.
-    inversion H0.
-    easy.
-    - simpl in *.
-    specialize (H0 0).
-    simpl in *.
-    easy.
-  Qed. *)
-
   Lemma l2 : rc_entail_frame loop loop mayloop.
   Proof.
     unfold rc_entail_frame.
     unfold rc_entail.
     unfold rc_split.
     intros.
-    unfold resources_split in H0. destruct r. destruct r1. destruct r2.
+    unfold resources_split_constr in H0. destruct r. destruct r1. destruct r2.
     destruct H.
     subst.
-    forward H0 by unfold nati_le; destruct u0; easy.
+    forward H0 by unfolds; destruct u0; easy.
     forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
-    destruct H0 as [Hmin [Hmax [Hl Hu]]].
+    destruct H0 as [Hl Hu].
 
     (* we need to determine these values *)
     unfold loop.
@@ -374,12 +302,13 @@ Section RC.
     unfold rc.
 
     (* how? *)
-    (* assert (forall a, a <= inf)%nati. admit. *)
-    pose proof (inf_greatest l0) as H0.
-    (* pose proof (aa2 _ _ _ H0 Hmin Hl) as H1.
-    simpl in H1. *)
+    intuition.
+    - destruct l0 eqn:H0.
+    (* what if l0 is finite? won't be able to prove loop *)
 
-    destruct l0.
+    (* TODO *)
+    simpl in Hl. destruct u0. simpl in *. inj Hu.
+    (* destruct l0; destruct l1; destruct u0; destruct u1. *)
 
     admit. (* find contradiction if l0 is finite *)
   Abort.
@@ -390,37 +319,21 @@ Section RC.
     unfold rc_entail.
     unfold rc_split.
     intros.
-    unfold resources_split in H0. destruct r. destruct r1. destruct r2.
+    unfold resources_split_constr in H0. destruct r. destruct r1. destruct r2.
     destruct H.
     subst.
     forward H0 by unfold nati_le; destruct u0; easy.
     forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
-    destruct H0 as [Hmin [Hmax [Hl Hu]]].
-
-    (* specialize (Hmin 0). *)
-    (* simpl in Hmin. *)
-    (* destruct l0. *)
+    destruct H0 as [Hl Hu].
 
     unfold mayloop.
     unfold rc.
 
-    assert (l0 <= 0)%nati.
-    unfold nati_le.
-
-    admit.
-    (* pose proof (aa2 _ _ _ H Hmin Hl). *)
-    (* simpl in H0. *)
     destruct l0.
-    subst.
-    simpl in *.
-
-    (* intuition. *)
-    (* specialize (Hmin l0). *)
-    (* apply aa1. *)
-
-
-    (* split. *)
-    (* TODO *)
+    simpl in *. subst.
+    destruct u0.
+    simpl in *. inj Hu.
+    intuition.
   Abort.
 
   Lemma rc_eq : forall al au bl bu,
