@@ -238,6 +238,29 @@ Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resour
       - rewrite nati_le_inf in H1.
     Abort.
 
+    (* mayloop |- mayloop |> loop *)
+
+    Example e8_split : resources_split
+      (rb inf inf) (rb inf inf) (rb 0 inf).
+    Proof. unfold resources_split. intros. intuition.
+      - simpl in H1.
+        apply nati_zero_smallest.
+      - apply inf_greatest.
+    Qed.
+
+    Example e9_split : resources_split_constr
+      (rb inf inf) (rb inf inf) (rb 0 inf).
+    Proof.
+      unfolds. intros. intuition.
+    Qed.
+
+    Example e10_split : resources_split
+      (rb inf inf) (rb inf inf) (rb 0 inf).
+    Proof.
+      apply resources_split_refine.
+      apply e9_split.
+    Qed.
+
   End Examples.
 
   Definition rc_assert := resources -> Prop.
@@ -289,10 +312,11 @@ Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resour
     unfold rc_entail.
     unfold rc_split.
     intros.
-    unfold resources_split_constr in H0. destruct r. destruct r1. destruct r2.
+    unfold resources_split_constr in H0.
+    destruct r as [al au]. destruct r1 as [bl bu]. destruct r2 as [cl cu].
     destruct H.
     subst.
-    forward H0 by unfolds; destruct u0; easy.
+    forward H0 by unfolds; destruct bu; easy.
     forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
     destruct H0 as [Hl Hu].
 
@@ -303,7 +327,9 @@ Notation "a ⊝ b = c" := (resources_split_constr a b c) (at level 100) : resour
 
     (* how? *)
     intuition.
-    - destruct l0 eqn:H0.
+    -
+    destruct bl eqn:H0.
+    destruct cl.
     (* what if l0 is finite? won't be able to prove loop *)
 
     (* TODO *)

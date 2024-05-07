@@ -283,6 +283,12 @@ Proof.
   - easy.
 Qed.
 
+Lemma nati_zero_smallest : forall a, (0 <= a)%nati.
+Proof.
+  intros.
+  unfold nati_le. destruct a. lia. easy.
+Qed.
+
 Lemma inf_greatest : forall a, (a <= inf)%nati.
 Proof.
   intros.
