@@ -168,25 +168,45 @@ Section RC.
           cl = min_st_lb bl al /\ Some cu = max_st_ub bu au)%nati
       end.
 
-    Lemma resources_split_equiv : forall a b c,
+    (** The constructive definition is a refinement of the definition in the paper. *)
+    Lemma resources_split_refine : forall a b c,
       resources_split_constr a b c -> resources_split a b c.
     Proof.
       intros.
       destruct a. destruct b. destruct c.
-        unfolds in H.
-        unfolds.
-        intros.
-        forward H by auto.
-        forward H by auto.
-        destruct H as [Hmin Hmax].
-        intuition.
-        -
+      unfolds in H.
+      unfolds.
+      intros.
+      forward H by auto.
+      forward H by auto.
+      destruct H as [Hmin Hmax].
 
-        admit.
-        - admit.
-        - admit.
-        - admit.
-    Abort.
+      intuition.
+      - intros.
+        pose proof (min_st_lb_minimal l l0 l1) as Hmin1.
+        forward Hmin1 by auto.
+        specialize (Hmin1 x H).
+        assumption.
+      - intros.
+        pose proof (max_st_ub_maximal u u0 u1) as Hmax1.
+        specialize (Hmax1 H0).
+        forward Hmax1 by auto.
+        specialize (Hmax1 x H).
+        assumption.
+      - rewrite Hmin.
+        destruct l0; destruct l; simpl in Hmin; simpl; try easy || lia.
+      - destruct u0; destruct u; simpl in Hmax.
+        + injection Hmax; clear Hmax; intros Hmax; subst.
+          simpl.
+          simpl in H0.
+          rewrite Nat.sub_add; easy.
+        + injection Hmax; clear Hmax; intros Hmax; subst.
+          easy.
+        + inv Hmax.
+        + injection Hmax; clear Hmax; intros Hmax; subst.
+          easy.
+    Qed.
+
   End Constructive.
 
   Section Examples.
