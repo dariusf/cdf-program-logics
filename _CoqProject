@@ -10,3 +10,5 @@ Trace.v
 Flow.v
 Separation2.v
 Common.v
+Tactics.v
+Outcome.v

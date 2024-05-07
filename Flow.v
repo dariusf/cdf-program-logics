@@ -1,90 +1,12 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Common Sequences Separation2.
+From CDF Require Import Common Sequences Separation2 Tactics.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
-
-(* some old tactics *)
-
-Tactic Notation "inj" constr(h) := injection h as h; subst.
-Tactic Notation "ok" := intuition auto; try easy.
-
-(* these could be made less powerful in future, so they can't be used wrongly *)
-Tactic Notation "vacuous" := easy.
-(* Tactic Notation "ih" := ok. *)
-
-Tactic Notation "case_on" constr(e) := let H := fresh in destruct e eqn:H; ok.
-Tactic Notation "case_on" constr(e) ident(x) := destruct e eqn:x; ok.
-(* Tactic Notation "gen" ident_list(x) := generalize dependent x. *)
-
-(* new ones *)
-
-Ltac inv H := inversion H; clear H; subst.
-(* Tactic Notation "inv" constr(h) := inversion h; subst. *)
-(* Ltac invp H P := inversion H as P; clear H; subst. *)
-Tactic Notation "invp" constr(h) simple_intropattern(p) := inversion h as p; subst; clear h.
-
-Ltac HUNION n :=
-  match n with
-  | O => idtac "out of fuel"
-  | S ?n' =>
-  intuition;
-    match goal with
-    | [ H: _ = hunion hempty _ |- _ ] =>
-    (* let t := type of H in idtac "empty" t n'; *)
-        rewrite hunion_empty in H;
-        HUNION n'
-    | [ H: _ = hunion _ hempty |- _ ] =>
-        rewrite hunion_comm in H;
-        HDISJ;
-        rewrite hunion_empty in H;
-        HUNION n'
-    | [ |- _ = hunion hempty _ ] =>
-        rewrite hunion_empty; HUNION n'
-    | [ |- hunion hempty _ = _ ] =>
-        rewrite hunion_empty; HUNION n'
-    | [ |- _ = hunion _ hempty ] =>
-        rewrite hunion_comm; HDISJ; rewrite hunion_empty; HUNION n'
-    | [ |- hunion _ hempty = _ ] =>
-        rewrite hunion_comm; HDISJ;
-        rewrite hunion_empty;
-        HUNION n'
-    | [ |- ?g ] => auto
-    end
-  end.
-
-Ltac heap := HUNION (3%nat); HDISJ; auto.
-
-(* Ltac rw := rewrite. *)
-(* Ltac con := constructor. *)
-
-(* https://github.com/tchajed/coq-tricks/blob/master/src/Deex.v *)
-(* Ltac deex :=
-  repeat match goal with
-         | [ H: exists (name:_), _ |- _ ] =>
-           let name' := fresh name in
-           destruct H as [name' H]
-         end. *)
-
-Ltac destr H :=
-  match type of H with
-  | ex _ =>
-    let L := fresh in
-    let R := fresh in
-    destruct H as [L R]; destr R
-  (* | [ H: exists (name:_), _ |- _ ] =>
-    let name' := fresh name in
-    destruct H as [name' H] *)
-  | _ /\ _ =>
-    let L := fresh in
-    let R := fresh in
-    destruct H as [L R]; destr L; destr R
-  | _ => idtac
-  end.
 
 Module Biabduction.
 

@@ -1,7 +1,7 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Common Sequences.
+From CDF Require Import Common Sequences Tactics.
 From Coq Require Import ssreflect ssrfun ssrbool.
 
 Local Open Scope string_scope.
@@ -10,44 +10,6 @@ Local Open Scope core_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
-Ltac inv H := inversion H; clear H; subst.
-
-(* https://github.com/mattam82/Coq-Equations/blob/main/theories/Init.v#L148 *)
-Ltac forward_gen H tac :=
-  match type of H with
-  | forall (_ : ?X), _ => let H' := fresh in assert (H':X) ; [tac|specialize (H H'); clear H']
-  end.
-
-Tactic Notation "forward" constr(H) := forward_gen H ltac:(idtac).
-Tactic Notation "forward" constr(H) "by" tactic(tac) := forward_gen H tac.
-
-(* https://softwarefoundations.cis.upenn.edu/plf-current/LibTactics.html *)
-Ltac get_head E :=
-  match E with
-  | ?E' ?x => get_head E'
-  | _ => constr:(E)
-  end.
-
-Ltac apply_to_head_of E cont :=
-  let go E :=
-    let P := get_head E in cont P in
-  match E with
-  | forall _,_ => intros; apply_to_head_of E cont
-  | ?A = ?B => first [ go A | go B ]
-  | ?A => go A
-  end.
-Ltac unfolds_base :=
-  match goal with |- ?G =>
-   apply_to_head_of G ltac:(fun P => unfold P) end.
-
-Tactic Notation "unfolds" :=
-  unfolds_base.
-
-Ltac unfolds_in_base H :=
-  match type of H with ?G =>
-   apply_to_head_of G ltac:(fun P => unfold P in H) end.
-Tactic Notation "unfolds" "in" hyp(H) :=
-  unfolds_in_base H.
 
 
 Section RC.
@@ -114,7 +76,7 @@ Section RC.
       destruct b as [nb|]; destruct a as [na|].
       - destruct x as [nx|]. destruct c as [nc|].
         + simpl in *.
-          injection H; clear H; intros H.
+          inj H.
           lia.
         + inv H.
         + apply inf_greatest.
@@ -144,16 +106,15 @@ Section RC.
       unfolds in H.
       destruct b as [nb|]; destruct a as [na|].
       - simpl in *.
-        injection H0; clear H0; intros H0.
-        rewrite <- H0.
+        inj H0.
         apply (nati_plus_le x nb na); auto.
       - simpl in H0.
-        injection H0; clear H0; intros H0.
+        inj H0.
         subst.
         apply inf_greatest.
       - inv H.
       - simpl in *.
-        injection H0; clear H0; intros H0.
+        inj H0.
         subst.
         apply inf_greatest.
     Qed.
@@ -196,14 +157,14 @@ Section RC.
       - rewrite Hmin.
         destruct l0; destruct l; simpl in Hmin; simpl; try easy || lia.
       - destruct u0; destruct u; simpl in Hmax.
-        + injection Hmax; clear Hmax; intros Hmax; subst.
+        + inj Hmax.
           simpl.
           simpl in H0.
           rewrite Nat.sub_add; easy.
-        + injection Hmax; clear Hmax; intros Hmax; subst.
+        + inj Hmax.
           easy.
         + inv Hmax.
-        + injection Hmax; clear Hmax; intros Hmax; subst.
+        + inj Hmax.
           easy.
     Qed.
 
@@ -678,7 +639,7 @@ Section Bigstep.
     intros.
     unfold triple.
     intros.
-    unfold ok_only in H; injection H; clear H; intros.
+    unfold ok_only in H; injection H as H.
     repeat split; intros.
     - inversion H3; subst; clear H3.
       unfold rand; easy.
