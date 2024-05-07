@@ -321,7 +321,7 @@ Section RC.
     easy.
   Qed.
 
-  Lemma l2 : rc_entail_frame loop loop mayloop.
+  (* Lemma l2 : rc_entail_frame loop loop mayloop.
   Proof.
     unfold rc_entail_frame.
     unfold rc_entail.
@@ -374,7 +374,7 @@ Section RC.
     destruct u0.
     simpl in *. inj Hu.
     intuition.
-  Abort.
+  Abort. *)
 
   Lemma rc_eq : forall al au bl bu,
     rc_entail (rc al au) (rc bl bu) <->
