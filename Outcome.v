@@ -10,8 +10,6 @@ Local Open Scope core_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
-
-
 Section RC.
   Local Open Scope nat_scope.
   Inductive resources := rb (l:nati) (u:nati).
@@ -37,9 +35,8 @@ Section RC.
     destruct u; intuition lia.
   Qed.
 
-  (* executions allowed by a can be decomposed into executions requiring b,
-    followed by executions requiring c.
-    informally, like a - b = c *)
+  (** Executions allowed by a can be decomposed into executions requiring b,
+    followed by executions requiring c. Informally, like a - b = c. *)
   Definition resources_split (a b c:resources) : Prop :=
     match a, b, c with
     | rb al au, rb bl bu, rb cl cu =>
@@ -54,10 +51,9 @@ Section RC.
         lb must be greater (as we must consume as least as much as required) *)
       cl + bl >= al /\ cu + bu <= au)%nati
     end.
-  (* https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
+  (* possible alternative: https://stackoverflow.com/questions/50445983/minimum-in-non-empty-finite-set *)
 
-
-  (* min such that lower bound, i.e. min{x | x + b <= a} *)
+  (** min such that lower bound, i.e. min{x | x + b <= a} *)
   Definition min_st_lb (b a:nati) : nati :=
     match b, a with
     | n b, n a => n (a-b)%nat
@@ -66,7 +62,7 @@ Section RC.
     | inf, inf => 0
     end.
 
-  (* c via the constructive defn is indeed minimal *)
+  (** c via the constructive definition is indeed minimal *)
   Lemma min_st_lb_minimal : forall a b c,
     min_st_lb b a = c -> (forall x, x + b >= a -> c <= x)%nati.
   Proof.
@@ -87,7 +83,7 @@ Section RC.
     - subst. destruct x; simpl; lia.
   Qed.
 
-  (* max such that upper bound, i.e. max{x | x + b >= a} *)
+  (** max such that upper bound, i.e. max{x | x + b >= a} *)
   Definition max_st_ub (b a:nati) : option nati :=
     match b, a with
     | n b, n a => Some (n (a-b)%nat)
@@ -96,7 +92,7 @@ Section RC.
     | inf, inf => Some inf
     end.
 
-  (* c via the constructive defn is indeed maximal *)
+  (** c via the constructive definition is indeed maximal *)
   Lemma max_st_ub_maximal : forall a b c,
     (b <= a)%nati ->
     max_st_ub b a = Some c -> (forall x, x + b <= a -> c >= x)%nati.
@@ -180,7 +176,7 @@ Section RC.
     - now simpl.
     Qed.
 
-    (* cannot take more than available *)
+    (** cannot take more than available *)
     Example e1_split_f : resources_split
       (rb 0 3) (rb 0 2) (rb 0 2).
     Proof. unfold resources_split. intros. intuition.
@@ -189,7 +185,7 @@ Section RC.
       simpl in H1.
     Abort.
 
-    (* given inf, we can have as much remaining as we want *)
+    (** Given inf, we can have as much remaining as we want *)
     Example e2_split : resources_split
       (rb 0 inf) (rb 0 2) (rb 0 inf).
     Proof. unfold resources_split. intros. intuition.
@@ -206,7 +202,7 @@ Section RC.
       - now simpl.
     Qed.
 
-    (* but not as little *)
+    (** but not as little *)
     Example e5_split : resources_split
       (rb 0 inf) (rb 0 2) (rb 0 1).
     Proof. unfold resources_split. intros. intuition.
@@ -221,7 +217,7 @@ Section RC.
       - rewrite nati_le_inf in H1.
     Abort.
 
-    (* we can even extract inf and have inf remaining *)
+    (** we can even extract inf and have inf remaining *)
     Example e4_split : resources_split
       (rb 0 inf) (rb 0 inf) (rb 0 inf).
     Proof. unfold resources_split. intros. intuition.
@@ -230,15 +226,13 @@ Section RC.
       - now simpl.
     Qed.
 
-    (* but not nothing *)
+    (** but not nothing *)
     Example e7_split : resources_split
       (rb 0 inf) (rb 0 inf) (rb 0 0).
     Proof. unfold resources_split. intros. intuition.
       - now rewrite nati_plus_0 in H1.
       - rewrite nati_le_inf in H1.
     Abort.
-
-    (* mayloop |- mayloop |> loop *)
 
     Example e8_split : resources_split
       (rb inf inf) (rb inf inf) (rb 0 inf).
@@ -290,6 +284,7 @@ Section RC.
   Definition rc_entail (a b:rc_assert) : Prop :=
     forall r, a r -> b r.
   Notation "a ⊢ b" := (rc_entail a b) (at level 85) : resources_scope.
+  (* mayloop |- mayloop |> loop *)
 
   Definition rc_and (a b:rc_assert) : rc_assert :=
     fun r => a r /\ b r.
@@ -410,8 +405,7 @@ Inductive expr : Type :=
   | plet (x: ident) (e1: expr) (e2: expr)
   | passign (x1: ident) (x2: ident)
   | pif (x: ident) (e1: expr) (e2: expr)
-  | pcall (x: ident) (a: ident)
-  .
+  | pcall (x: ident) (a: ident).
 
 (* Inductive eresult : Type :=
   | enorm : val -> eresult
@@ -465,8 +459,7 @@ Section Bigstep.
       s1 = supdate x1 v s ->
       eval[ s, passign x1 x2 ] => [ s1, Some 0 ]
 
-  where " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " := (bigstep s e s1 r)
-  .
+  where " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " := (bigstep s e s1 r).
 
   Example e1 : forall x1 x2 s,
     s = supdate x2 1 (supdate x1 0 sempty) ->
