@@ -289,7 +289,7 @@ Section RC.
 
   Definition rc_entail (a b:rc_assert) : Prop :=
     forall r, a r -> b r.
-  Notation "a ⊢ b" := (rc_entail a b) (at level 100) : resources_scope.
+  Notation "a ⊢ b" := (rc_entail a b) (at level 85) : resources_scope.
 
   Definition rc_and (a b:rc_assert) : rc_assert :=
     fun r => a r /\ b r.
@@ -301,80 +301,47 @@ Section RC.
     exists r1 r2,
     resources_split_constr r r1 r2 ->
     a r1 /\ b r2.
-  Notation "a ▶ b" := (rc_split a b) (at level 100) : resources_scope.
+  Notation "a ▶ b" := (rc_split a b) (at level 80) : resources_scope.
 
   Definition rc_entail_frame (a b c:rc_assert) : Prop :=
     rc_entail a (rc_split b c).
 
   (* \vdash \blacktriangleright *)
-  Notation "a ⊢ b ▶ c" := (rc_entail_frame a b c) (at level 100) : resources_scope.
+  (* Notation "a ⊢ b ▶ c" := (rc_entail_frame a b c) (at level 100) : resources_scope. *)
 
-  Lemma aa : forall l1 l0,
-    (forall x : nati, (0 <= x + l0)%nati -> (l1 <= x)%nati) ->
-    (0 <= l1 + l0)%nati.
-  Proof.
-    intros.
-    specialize (H 0).
-    simpl.
-    destruct (l1 + l0)%nati.
-    lia.
-    easy.
-  Qed.
+  Section Entailments.
+    Local Open Scope resources_scope.
 
-  (* Lemma l2 : rc_entail_frame loop loop mayloop.
-  Proof.
-    unfold rc_entail_frame.
-    unfold rc_entail.
-    unfold rc_split.
-    intros.
-    destruct r as [al au]. destruct r1 as [bl bu]. destruct r2 as [cl cu].
-    destruct H; subst.
-    unfold resources_split_constr in H0.
-    forward H0 by unfolds; destruct bu; easy.
-    forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
-    destruct H0 as [Hl Hu].
+    Ltac solve a b :=
+      unfold rc_entail_frame;
+      unfold rc_entail;
+      unfold rc_split;
+      intros r;
+      destruct r as [al au];
+      exists a; exists b;
+      easy.
 
-    (* we need to determine these values *)
-    unfold loop.
-    unfold mayloop.
-    unfold rc.
+    Lemma mayloop_mayloop_mayloop : mayloop ⊢ mayloop ▶ mayloop.
+    Proof.
+      solve (rb 0 inf) (rb 0 inf).
+    Qed.
 
-    (* how? *)
-    intuition.
-    -
-    destruct bl eqn:H0.
-    destruct cl.
-    (* what if l0 is finite? won't be able to prove loop *)
+    Lemma mayloop_loop_mayloop : mayloop ⊢ loop ▶ mayloop.
+    Proof.
+      solve (rb inf inf) (rb 0 inf).
+    Qed.
 
-    (* TODO *)
-    simpl in Hl. destruct u0. simpl in *. inj Hu.
-    (* destruct l0; destruct l1; destruct u0; destruct u1. *)
+    Lemma loop_mayloop_loop : loop ⊢ mayloop ▶ loop.
+    Proof.
+      solve (rb 0 inf) (rb inf inf).
+    Qed.
 
-    admit. (* find contradiction if l0 is finite *)
-  Abort.
+    Lemma loop_loop_mayloop : loop ⊢ loop ▶ mayloop.
+    Proof.
+      solve (rb inf inf) (rb 0 inf).
+    Qed.
 
-  Lemma l1 : rc_entail_frame mayloop mayloop mayloop.
-  Proof.
-    unfold rc_entail_frame.
-    unfold rc_entail.
-    unfold rc_split.
-    intros.
-    unfold resources_split_constr in H0. destruct r. destruct r1. destruct r2.
-    destruct H.
-    subst.
-    forward H0 by unfold nati_le; destruct u0; easy.
-    forward H0 by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
-    destruct H0 as [Hl Hu].
-
-    unfold mayloop.
-    unfold rc.
-
-    destruct l0.
-    simpl in *. subst.
-    destruct u0.
-    simpl in *. inj Hu.
-    intuition.
-  Abort. *)
+  End Entailments.
 
   Lemma rc_eq : forall al au bl bu,
     rc_entail (rc al au) (rc bl bu) <->
