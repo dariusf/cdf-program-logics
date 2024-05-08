@@ -277,9 +277,38 @@ Section RC.
     fun r =>
       match r with | rb ml mu => ml = l /\ mu = u end.
 
+  (** nat, not nati *)
+  (* Definition measure := list (store -> nat). *)
+  (* Fixpoint measure_lex (s:store) (a b:measure) : Prop :=
+    match a, b with
+    | nil, nil => True
+    | cons x xs, cons y ys =>
+      if x s =? y s then measure_lex s xs ys else x s < y s
+    | nil, cons _ _ => False
+    | cons _ _, nil => False
+    end.
+  Definition measure_le (a b:measure) : Prop :=
+    List.length a = List.length b /\ forall s, measure_lex s a b.
+  Definition measure_sub (a b:measure) : measure := ?. *)
+
+  Definition measure := store -> nat.
+  Definition measure_lex (s:store) (a b:measure) : Prop := a s < b s.
+  Definition measure_le (a b:measure) : Prop :=
+    forall s, measure_lex s a b.
+  Definition measure_sub (a b:measure) : measure := fun s => a s - b s.
+
+  Declare Scope measure_scope.
+  Delimit Scope measure_scope with measure.
+  Infix "<=" := measure_le : measure_scope.
+  Infix "-" := measure_sub : measure_scope.
+
+  Variable embed : measure -> nat.
+  Hypothesis embed_ord : forall m1 m2,
+    (m1 <= m2)%measure -> embed m1 <= embed m2.
+
   Definition mayloop := rc 0 inf.
   Definition loop := rc inf inf.
-  Definition term x := rc 0 x. (* TODO *)
+  Definition term (x:measure) := rc 0 (embed x).
 
   Definition rc_entail (a b:rc_assert) : Prop :=
     forall r, a r -> b r.
@@ -294,8 +323,7 @@ Section RC.
 
   Definition rc_split (a b:rc_assert) : rc_assert := fun r =>
     exists r1 r2,
-    resources_split_constr r r1 r2 ->
-    a r1 /\ b r2.
+    resources_split_constr r r1 r2 /\ a r1 /\ b r2.
   Notation "a ▶ b" := (rc_split a b) (at level 80) : resources_scope.
 
   Definition rc_entail_frame (a b c:rc_assert) : Prop :=
@@ -307,34 +335,129 @@ Section RC.
   Section Entailments.
     Local Open Scope resources_scope.
 
-    Ltac solve a b :=
-      unfold rc_entail_frame;
-      unfold rc_entail;
-      unfold rc_split;
-      intros r;
-      destruct r as [al au];
-      exists a; exists b;
-      easy.
-
     Lemma mayloop_mayloop_mayloop : mayloop ⊢ mayloop ▶ mayloop.
     Proof.
-      solve (rb 0 inf) (rb 0 inf).
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros r.
+      destruct r as [al au].
+      exists (rb 0 inf).
+      exists (rb 0 inf).
+      destruct al; destruct au.
+      - intuition easy.
+      - inv H.
+        inj H0.
+        intuition easy.
+      - intuition easy.
+      - simpl. intuition.
+        inv H.
+        easy.
+    Qed.
+
+    Lemma mayloop_term_mayloop : forall x, mayloop ⊢ term x ▶ mayloop.
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      destruct r as [al au].
+      exists (rb 0 (embed x)).
+      exists (rb 0 inf).
+      destruct al; destruct au; simpl in *; try intuition easy.
+      - destruct H.
+        inj H.
+        intuition easy.
     Qed.
 
     Lemma mayloop_loop_mayloop : mayloop ⊢ loop ▶ mayloop.
     Proof.
-      solve (rb inf inf) (rb 0 inf).
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros r.
+      destruct r as [al au].
+      exists (rb inf inf).
+      exists (rb 0 inf).
+      destruct al; destruct au; simpl in *; intuition easy.
     Qed.
 
     Lemma loop_mayloop_loop : loop ⊢ mayloop ▶ loop.
     Proof.
-      solve (rb 0 inf) (rb inf inf).
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros r.
+      destruct r as [al au].
+      exists (rb 0 inf).
+      exists (rb inf inf).
+      destruct al; destruct au; simpl in *; intuition easy.
+    Qed.
+
+    Lemma loop_term_loop : forall x, loop ⊢ term x ▶ loop.
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      destruct r as [al au].
+      exists (rb 0 (embed x)). exists (rb inf inf).
+      destruct al; destruct au; simpl in *; intuition easy.
     Qed.
 
     Lemma loop_loop_mayloop : loop ⊢ loop ▶ mayloop.
     Proof.
-      solve (rb inf inf) (rb 0 inf).
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros r.
+      destruct r as [al au].
+      exists (rb inf inf).
+      exists (rb 0 inf).
+      destruct al; destruct au; intuition easy.
     Qed.
+
+    (* Lemma term_term_term : forall x y,
+      term x ⊢ term y ▶ term (x - y)%measure.
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      destruct r as [al au].
+      exists (rb 0 (embed y)). exists (rb 0 (embed (x - y)%measure)).
+      easy.
+    Qed. *)
+
+    (* Lemma not_term_mayloop_any : forall x,
+      term x ⊢ mayloop ▶ mayloop.
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      (* destruct r as [al au].
+      unfolds in H.
+      unfolds in H. *)
+      exists (rb 0 inf).
+      exists (rb 0 inf).
+      intros.
+      unfolds in H0.
+destruct r as [al au].
+
+
+      (* forward H0 by apply is_inf. *)
+      (* forward H0 by auto. *)
+    (* uh oh *)
+    (* Show Proof. *)
+    (* split. *)
+    (* unfolds. *)
+    (* simpl *)
+      easy.
+    (* Show Proof. *)
+    Qed. *)
+
+(* Print not_term_mayloop_any. *)
 
   End Entailments.
 
