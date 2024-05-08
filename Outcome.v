@@ -176,7 +176,7 @@ Section RC.
     - now simpl.
     Qed.
 
-    (** cannot take more than available *)
+    (** Cannot have remaining more than available *)
     Example e1_split_f : resources_split
       (rb 0 3) (rb 0 2) (rb 0 2).
     Proof. unfold resources_split. intros. intuition.
@@ -184,6 +184,19 @@ Section RC.
     - rewrite nati_plus_le in H1; try lia.
       simpl in H1.
     Abort.
+
+    (** Taking more than available causes vacuous success *)
+    Example e1_split_f_1 : resources_split
+      (rb 0 3) (rb 0 4) (rb 0 2).
+    Proof. unfold resources_split. intros.
+      simpl in H. lia.
+    Qed.
+
+    (** Same for inf. *)
+    Example e12_split : resources_split
+      (rb 0 3) (rb 0 inf) (rb 0 inf).
+    Proof. unfold resources_split. intros. intuition easy.
+    Qed.
 
     (** Given inf, we can have as much remaining as we want *)
     Example e2_split : resources_split
@@ -438,7 +451,8 @@ Section RC.
         apply embed_sub_distr.
     Qed.
 
-    Lemma term_mayloop_any : forall x,
+    (** This succeeds vacuously *)
+    Lemma term_mayloop_mayloop : forall x,
       term x ⊢ mayloop ▶ mayloop.
     Proof.
       unfold rc_entail_frame.
@@ -449,97 +463,29 @@ Section RC.
       exists (rb 0 inf).
       simpl.
       intuition.
-      unfolds in H.
-      destruct r.
-      unfolds in H.
-      destruct H.
-      subst.
+      unfolds in H; destruct r; unfolds in H; destruct H; subst.
       simpl.
       intros.
       easy.
     Qed.
 
-    (* Lemma not_term_mayloop_any : forall x,
-      ~ (term x ⊢ mayloop ▶ mayloop).
+    (** This too *)
+    Lemma term_mayloop_loop : forall x,
+      term x ⊢ mayloop ▶ loop.
     Proof.
       unfold rc_entail_frame.
       unfold rc_entail.
       unfold rc_split.
       intros.
-      (* destruct r as [al au].
-      unfolds in H.
-      unfolds in H. *)
-      unfold not.
-      intros.
-      specialize (H (rb 0 (embed x))).
-      forward H by easy.
-      destruct H as [r1 [r2 [Hsplit [Hr1 Hr2]]]].
-
-      destruct r1.
-      destruct r2.
-      unfolds in Hsplit.
-      (* need to see what u and l are *)
-      destruct Hr1.
-      destruct Hr2.
-      subst.
-      simpl in *.
-
-      inj Hsplit.
-      discriminate Hsplit.
-
-      easy.
-
-      (* exists (rb 0 inf).
       exists (rb 0 inf).
-      intros.
+      exists (rb inf inf).
       simpl.
-      unfolds in H.
-      unfolds in H0.
-destruct r as [al au]. *)
-
-
-      (* forward H0 by apply is_inf. *)
-      (* forward H0 by auto. *)
-    (* uh oh *)
-    (* Show Proof. *)
-    (* split. *)
-    (* unfolds. *)
-    (* simpl *)
-      (* easy. *)
-    (* Show Proof. *)
-    Qed. *)
-
-    (* Lemma not_term_mayloop_any : forall x,
-      term x ⊢ mayloop ▶ mayloop.
-    Proof.
-      unfold rc_entail_frame.
-      unfold rc_entail.
-      unfold rc_split.
-      intros.
-      (* destruct r as [al au].
-      unfolds in H.
-      unfolds in H. *)
-      exists (rb 0 inf).
-      exists (rb 0 inf).
-      intros.
+      intuition.
+      unfolds in H; destruct r; unfolds in H; destruct H; subst.
       simpl.
-      unfolds in H.
-      unfolds in H0.
-destruct r as [al au].
-
-
-      (* forward H0 by apply is_inf. *)
-      (* forward H0 by auto. *)
-    (* uh oh *)
-    (* Show Proof. *)
-    (* split. *)
-    (* unfolds. *)
-    (* simpl *)
+      intros.
       easy.
-    (* Show Proof. *)
-    Qed. *)
-
-(* Print not_term_mayloop_any. *)
+    Qed.
 
   End Entailments.
 
