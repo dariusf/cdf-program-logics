@@ -42,17 +42,25 @@ jobs:
 
           # https://github.com/coq-community/docker-coq-action#permissions
           install: |
-            git clone https://github.com/xavierleroy/coq2html
-            cd coq2html
-            make
-            make install
-            cd -
-            rm -rf coq2html
+            startGroup "Install coq2html"
+              git clone https://github.com/xavierleroy/coq2html
+              cd coq2html
+              make
+              make install
+              cd -
+              rm -rf coq2html
+            endGroup
+            startGroup "Install Alectryon"
+              sudo apt-get update
+              sudo apt-get install -y python3-pip
+              pip install alectryon
+            endGroup
 
           script: |
             startGroup "Build project"
               make
               make documentation
+              make alectryon
             endGroup
 
       # why does this take so long?
