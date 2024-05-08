@@ -305,6 +305,8 @@ Section RC.
   Variable embed : measure -> nat.
   Hypothesis embed_ord : forall m1 m2,
     (m1 <= m2)%measure -> embed m1 <= embed m2.
+  Hypothesis embed_sub_distr : forall x y,
+    embed (x - y)%measure = embed x - embed y.
 
   Definition mayloop := rc 0 inf.
   Definition loop := rc inf inf.
@@ -417,7 +419,7 @@ Section RC.
       destruct al; destruct au; intuition easy.
     Qed.
 
-    (* Lemma term_term_term : forall x y,
+    Lemma term_term_term : forall x y,
       term x ⊢ term y ▶ term (x - y)%measure.
     Proof.
       unfold rc_entail_frame.
@@ -426,7 +428,85 @@ Section RC.
       intros.
       destruct r as [al au].
       exists (rb 0 (embed y)). exists (rb 0 (embed (x - y)%measure)).
+      destruct al; destruct au; simpl in *; try intuition easy.
+      intuition.
+      - now inj H0.
+      - inj H0.
+        f_equal.
+        inj H1.
+        f_equal.
+        apply embed_sub_distr.
+    Qed.
+
+    Lemma term_mayloop_any : forall x,
+      term x ⊢ mayloop ▶ mayloop.
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      exists (rb 0 inf).
+      exists (rb 0 inf).
+      simpl.
+      intuition.
+      unfolds in H.
+      destruct r.
+      unfolds in H.
+      destruct H.
+      subst.
+      simpl.
+      intros.
       easy.
+    Qed.
+
+    (* Lemma not_term_mayloop_any : forall x,
+      ~ (term x ⊢ mayloop ▶ mayloop).
+    Proof.
+      unfold rc_entail_frame.
+      unfold rc_entail.
+      unfold rc_split.
+      intros.
+      (* destruct r as [al au].
+      unfolds in H.
+      unfolds in H. *)
+      unfold not.
+      intros.
+      specialize (H (rb 0 (embed x))).
+      forward H by easy.
+      destruct H as [r1 [r2 [Hsplit [Hr1 Hr2]]]].
+
+      destruct r1.
+      destruct r2.
+      unfolds in Hsplit.
+      (* need to see what u and l are *)
+      destruct Hr1.
+      destruct Hr2.
+      subst.
+      simpl in *.
+
+      inj Hsplit.
+      discriminate Hsplit.
+
+      easy.
+
+      (* exists (rb 0 inf).
+      exists (rb 0 inf).
+      intros.
+      simpl.
+      unfolds in H.
+      unfolds in H0.
+destruct r as [al au]. *)
+
+
+      (* forward H0 by apply is_inf. *)
+      (* forward H0 by auto. *)
+    (* uh oh *)
+    (* Show Proof. *)
+    (* split. *)
+    (* unfolds. *)
+    (* simpl *)
+      (* easy. *)
+    (* Show Proof. *)
     Qed. *)
 
     (* Lemma not_term_mayloop_any : forall x,
@@ -442,6 +522,8 @@ Section RC.
       exists (rb 0 inf).
       exists (rb 0 inf).
       intros.
+      simpl.
+      unfolds in H.
       unfolds in H0.
 destruct r as [al au].
 
