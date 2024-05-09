@@ -6,9 +6,27 @@ From Coq Require Import ssreflect ssrfun ssrbool.
 
 Local Open Scope string_scope.
 Local Open Scope core_scope.
-(* Local Open Scope nat_scope. *)
-Local Open Scope Z_scope.
+Local Open Scope nat_scope.
 Local Open Scope list_scope.
+
+Section Outcome.
+
+Definition measure := store -> nat.
+Definition measure_lex (s:store) (a b:measure) : Prop := a s < b s.
+Definition measure_le (a b:measure) : Prop :=
+  forall s, measure_lex s a b.
+Definition measure_sub (a b:measure) : measure := fun s => a s - b s.
+
+Declare Scope measure_scope.
+Delimit Scope measure_scope with measure.
+Infix "<=" := measure_le : measure_scope.
+Infix "-" := measure_sub : measure_scope.
+
+Variable embed : measure -> nat.
+Hypothesis embed_ord : forall m1 m2,
+  (m1 <= m2)%measure -> embed m1 <= embed m2.
+Hypothesis embed_sub_distr : forall x y,
+  embed (x - y)%measure = embed x - embed y.
 
 Section RC.
   Local Open Scope nat_scope.
@@ -304,23 +322,6 @@ Section RC.
     List.length a = List.length b /\ forall s, measure_lex s a b.
   Definition measure_sub (a b:measure) : measure := ?. *)
 
-  Definition measure := store -> nat.
-  Definition measure_lex (s:store) (a b:measure) : Prop := a s < b s.
-  Definition measure_le (a b:measure) : Prop :=
-    forall s, measure_lex s a b.
-  Definition measure_sub (a b:measure) : measure := fun s => a s - b s.
-
-  Declare Scope measure_scope.
-  Delimit Scope measure_scope with measure.
-  Infix "<=" := measure_le : measure_scope.
-  Infix "-" := measure_sub : measure_scope.
-
-  Variable embed : measure -> nat.
-  Hypothesis embed_ord : forall m1 m2,
-    (m1 <= m2)%measure -> embed m1 <= embed m2.
-  Hypothesis embed_sub_distr : forall x y,
-    embed (x - y)%measure = embed x - embed y.
-
   Definition mayloop := rc 0 inf.
   Definition loop := rc inf inf.
   Definition term (x:measure) := rc 0 (embed x).
@@ -542,9 +543,6 @@ Section RC.
     congruence.
   Qed.
 
-  (* Inductive rea := Term | MayLoop | Loop. *)
-  (* resource assertion *)
-
 End RC.
 
 Definition val := Z.
@@ -571,6 +569,8 @@ Definition fupdate (x: ident) (v: fndef) (s: fnenv) : fnenv :=
 
 Section Bigstep.
 
+
+  Local Open Scope Z_scope.
   Variable fenv : fnenv.
 
   Reserved Notation " 'eval[' s ',' e ']' '=>' '[' s1 ',' r ']' " (at level 50, left associativity).
@@ -630,17 +630,25 @@ Section Bigstep.
   Definition precond := assertion.
   Definition postcond := val -> rassertion.
 
-  (* Inductive lar := LR (d:precond) (r:rea). *)
-  (* logic and resource *)
-
   Inductive outcome : Type :=
     | ok_er_nt : postcond -> precond -> precond -> outcome.
 
   Definition ok_only (q:postcond) : outcome := ok_er_nt q
     (fun _ => False) (fun _ => False).
 
+  Inductive rc_a : Type :=
+    | MayLoop
+    | Loop
+    | Term (x:measure).
+
+  Definition rc_a_interp (r:rc_a) : rc_assert :=
+    match r with
+    | MayLoop => mayloop
+    | Loop => loop
+    | Term x => term x
+    end.
+
   (* TODO sl entailment *)
-  (* TODO resource entailment *)
   (* TODO case specs *)
   (* TODO disjunction of D|R *)
 
@@ -844,3 +852,5 @@ Section Bigstep.
       forward (LR d r) (pcall f x) (ok_only (fun r => aand s (fun s => r = c))) *)
 
 End Bigstep.
+
+End Outcome.
