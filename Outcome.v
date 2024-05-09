@@ -708,29 +708,27 @@ Section Bigstep.
   Lemma f_pconst : forall v p,
     triple p (pconst v) (ok_only (fun r => rand p (fun old s => r = v))).
   Proof.
-    intros.
     unfold triple.
-    intros.
-    unfold ok_only in H; injection H as H.
-    repeat split; intros.
-    - inversion H3; subst; clear H3.
+    intros v p ok er nt r s s1 Hq Hp.
+    unfold ok_only in Hq; injection Hq as Hq.
+    repeat split.
+    - intros Heval. inversion Heval; subst; clear Heval.
       unfold rand; easy.
-    - inversion H3.
-    - inversion H3.
+    - intros Heval. inversion Heval.
+    - intros Hdiv. inversion Hdiv.
   Qed.
 
   Lemma f_var : forall x p,
     triple p (pvar x) (ok_only (fun r => rand p (fun old s => Some r = old x))).
   Proof.
-    intros.
     unfold triple.
-    intros.
-    unfold ok_only in H; injection H; clear H; intros.
-    repeat split; intros.
-    - inversion H3; subst; clear H3.
+    intros x p ok er nt r s s1 Hq Hp.
+    unfold ok_only in Hq; injection Hq; clear Hq; intros.
+    repeat split.
+    - intros Heval. inversion Heval; subst; clear Heval.
       unfold rand; easy.
-    - inversion H3.
-    - inversion H3.
+    - intros Heval. inversion Heval.
+    - intros Hdiv. inversion Hdiv.
   Qed.
 
   (* old(x)=1 /\ x=2 /\ y=4 *)
@@ -792,55 +790,54 @@ Section Bigstep.
       (fun s => s1b s \/ s2b s)
       (fun s => s1c s \/ s2c s)).
   Proof.
-    intros.
     unfold triple.
-    intros.
-    injection H1; clear H1; intros.
-    repeat split; intros.
-    - inv H5.
-      + unfold triple in H.
-        specialize (H s1a s1b s1c r s s1).
-        unfold aand in H.
-        forward H by reflexivity. forward H by intuition.
-        destruct H as [Hok [_ _]].
+    intros x e3 e4 p s1a s1b s1c s2a s2b s2c He1 He2 ok er nt r s s1 Hq Hp.
+    injection Hq; clear Hq; intros.
+    repeat split.
+    - intros Heval. inv Heval.
+      + unfold triple in He1.
+        specialize (He1 s1a s1b s1c r s s1).
+        unfold aand in He1.
+        forward He1 by reflexivity. forward He1 by intuition.
+        destruct He1 as [Hok [_ _]].
         forward Hok by assumption.
         now left.
-      + unfold triple in H0.
-        assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
-        unfold aand in H0. assert (p s /\ s x <> Some 0). { auto. }
-        specialize (H0 s2a s2b s2c r s s1 H1 H3).
-        destruct H0 as [Hok [_ _]].
-        specialize (Hok H12).
+      + unfold triple in He2.
+        specialize (He2 s2a s2b s2c r s s1).
+        forward He2 by auto.
+        forward He2 by unfolds; auto.
+        destruct He2 as [Hok [_ _]].
+        specialize (Hok H8).
         now right.
-    - inv H5.
-      + unfold triple in H.
-        assert (ok_er_nt s1a s1b s1c = ok_er_nt s1a s1b s1c). { reflexivity. }
-        unfold aand in H. assert (p s /\ s x = Some 0). { auto. }
-        specialize (H s1a s1b s1c 0 s s1 H1 H3).
-        destruct H as [_ [Her _]].
-        specialize (Her H12).
+    - intros Heval. inv Heval.
+      + unfold triple in He1.
+        specialize (He1 s1a s1b s1c 0 s s1).
+        forward He1 by auto.
+        forward He1 by unfolds; auto.
+        destruct He1 as [_ [Her _]].
+        specialize (Her H8).
         now left.
-      + unfold triple in H0.
-        assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
-        unfold aand in H0. assert (p s /\ s x <> Some 0). { auto. }
-        specialize (H0 s2a s2b s2c 0 s s1 H1 H3).
-        destruct H0 as [_ [Her _]].
-        specialize (Her H12).
+      + unfold triple in He2.
+        specialize (He2 s2a s2b s2c 0 s s1).
+        forward He2 by auto.
+        forward He2 by unfolds; auto.
+        destruct He2 as [_ [Her _]].
+        specialize (Her H8).
         now right.
-    - inv H5.
-      + unfold triple in H.
-        assert (ok_er_nt s1a s1b s1c = ok_er_nt s1a s1b s1c). { reflexivity. }
-        unfold aand in H. assert (p s /\ s x = Some 0). { auto. }
-        specialize (H s1a s1b s1c 0 s s1 H1 H3).
-        destruct H as [_ [_ Hnt]].
-        specialize (Hnt H9).
+    - intros Hdiv. inv Hdiv.
+      + unfold triple in He1.
+        specialize (He1 s1a s1b s1c 0 s s1).
+        forward He1 by auto.
+        forward He1 by unfolds; auto.
+        destruct He1 as [_ [_ Hnt]].
+        specialize (Hnt H5).
         now left.
-      + unfold triple in H0.
-        assert (ok_er_nt s2a s2b s2c = ok_er_nt s2a s2b s2c). { reflexivity. }
-        unfold aand in H0. assert (p s /\ s x <> Some 0). { auto. }
-        specialize (H0 s2a s2b s2c 0 s s1 H1 H3).
-        destruct H0 as [_ [_ Hnt]].
-        specialize (Hnt H9).
+      + unfold triple in He2.
+        specialize (He2 s2a s2b s2c 0 s s1).
+        forward He2 by auto.
+        forward He2 by unfolds; auto.
+        destruct He2 as [_ [_ Hnt]].
+        specialize (Hnt H5).
         now right.
   Qed.
 
