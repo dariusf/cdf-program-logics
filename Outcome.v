@@ -648,11 +648,6 @@ Section Bigstep.
     | Term x => term x
     end.
 
-  (* TODO sl entailment *)
-  (* TODO case specs *)
-  (* TODO disjunction of D|R *)
-
-  (* TODO defn of compose is wrong *)
 
   (*
     (old(x)=1 /\ x=2) o{x} (old(x)=2 /\ x=3)
@@ -668,11 +663,6 @@ Section Bigstep.
   (* Definition compose u (p1 p2:rassertion) : rassertion :=
     fun old s => p1 old u /\ p2 u s
   . *)
-  (* Definition compose (v:ident) (P Q:rassertion) : rassertion := *)
-  (* say P is (fun s1 => s1 "x" = 1) *)
-    (* fun old s => exists u, P (supdate v u s) /\ Q s *)
-    (* TODO this is existential on value, not variable *)
-    (* being able to refer to old(v) is a relational assertion *)
 
   CoInductive diverges : store -> expr -> Prop :=
 
@@ -694,35 +684,38 @@ Section Bigstep.
 
     .
 
-  Definition triple (P: precond) (e: expr) (Q: outcome) : Prop :=
-    forall ok er nt r s s1,
+  Definition triple (P: precond) (R: rc_a) (e: expr) (Q: outcome) : Prop :=
+    forall ok er nt res s s1 r,
       Q = ok_er_nt ok er nt ->
+      rc_a_interp R r ->
       P s ->
-           (eval[ s, e ] => [ s1, Some r ] -> ok r s s1)
+           (eval[ s, e ] => [ s1, Some res ] -> ok res s s1)
         /\ (eval[ s, e ] => [ s1, None ] -> er s)
         /\ (diverges s e -> nt s).
 
   Definition rand (P:assertion) (Q:rassertion) : rassertion :=
     fun old s => P old /\ Q old s.
 
-  Lemma f_pconst : forall v p,
-    triple p (pconst v) (ok_only (fun r => rand p (fun old s => r = v))).
+  Lemma f_pconst : forall v P R,
+    triple P R (pconst v) (ok_only (fun res => rand P (fun old s => res = v))).
   Proof.
+    intros v P R.
     unfold triple.
-    intros v p ok er nt r s s1 Hq Hp.
+    intros ok er nt res s s1 r Hq Hr Hp.
     unfold ok_only in Hq; injection Hq as Hq.
     repeat split.
-    - intros Heval. inversion Heval; subst; clear Heval.
+    - intros Heval. inv Heval.
       unfold rand; easy.
-    - intros Heval. inversion Heval.
-    - intros Hdiv. inversion Hdiv.
+    - intros Heval. inv Heval.
+    - intros Hdiv. inv Hdiv.
   Qed.
 
-  Lemma f_var : forall x p,
-    triple p (pvar x) (ok_only (fun r => rand p (fun old s => Some r = old x))).
+  Lemma f_var : forall x P R,
+    triple P R (pvar x) (ok_only (fun res => rand P (fun old s => Some res = old x))).
   Proof.
+    intros x P R.
     unfold triple.
-    intros x p ok er nt r s s1 Hq Hp.
+    intros ok er nt res s s1 r Hq Hp.
     unfold ok_only in Hq; injection Hq; clear Hq; intros.
     repeat split.
     - intros Heval. inversion Heval; subst; clear Heval.
@@ -761,92 +754,98 @@ Section Bigstep.
     now rewrite supdate_same.
   Qed.
 
-  Lemma f_passign : forall x1 x2 p,
-    triple p (passign x1 x2) (ok_only (fun _ => update p x1 x2)).
+  Lemma f_passign : forall x1 x2 P R,
+    triple P R (passign x1 x2) (ok_only (fun _ => update P x1 x2)).
   Proof.
-    intros.
+    intros x1 x2 P R.
     unfold triple.
-    intros.
-    unfold ok_only in H; injection H; clear H; intros.
-    repeat split; intros.
-    - rewrite <- H2.
-      inversion H3; subst; clear H3.
+    intros ok er nt res s s1 r H.
+    unfold ok_only in H; injection H; clear H; intros Hnt Her Hok.
+    repeat split.
+    - intros Heval. rewrite <- Hok.
+      inversion Heval; subst; clear Heval.
       unfold update.
       intros.
       split. auto.
       congruence.
-    - inversion H3.
-    - inversion H3.
+    - intros Heval. inversion Heval.
+    - intros Hdiv. inversion Hdiv.
   Qed.
 
   Definition aand (p1 p2:assertion) : assertion :=
     fun s => p1 s /\ p2 s.
 
-  Lemma f_pif : forall x e1 e2 p s1a s1b s1c s2a s2b s2c,
-    triple (aand p (fun s => s x = Some 0)) e1 (ok_er_nt s1a s1b s1c) ->
-    triple (aand p (fun s => s x <> Some 0)) e2 (ok_er_nt s2a s2b s2c) ->
-    triple p (pif x e1 e2) (ok_er_nt
+  Lemma f_pif : forall x e1 e2 P R s1a s1b s1c s2a s2b s2c,
+    triple (aand P (fun s => s x = Some 0)) R e1 (ok_er_nt s1a s1b s1c) ->
+    triple (aand P (fun s => s x <> Some 0)) R e2 (ok_er_nt s2a s2b s2c) ->
+    triple P R (pif x e1 e2) (ok_er_nt
       (fun r => fun old s => s1a r old s \/ s2a r old s)
       (fun s => s1b s \/ s2b s)
       (fun s => s1c s \/ s2c s)).
   Proof.
+    intros x e3 e4 P R s1a s1b s1c s2a s2b s2c.
     unfold triple.
-    intros x e3 e4 p s1a s1b s1c s2a s2b s2c He1 He2 ok er nt r s s1 Hq Hp.
+    intros He1 He2 ok er nt res s s1 r Hq Hr Hp.
     injection Hq; clear Hq; intros.
     repeat split.
     - intros Heval. inv Heval.
       + unfold triple in He1.
-        specialize (He1 s1a s1b s1c r s s1).
+        specialize (He1 s1a s1b s1c res s s1 r).
         unfold aand in He1.
-        forward He1 by reflexivity. forward He1 by intuition.
+        forward He1 by reflexivity.
+        forward He1 by intuition.
+        forward He1 by auto.
         destruct He1 as [Hok [_ _]].
         forward Hok by assumption.
         now left.
       + unfold triple in He2.
-        specialize (He2 s2a s2b s2c r s s1).
+        specialize (He2 s2a s2b s2c res s s1 r).
+        unfold aand in He2.
         forward He2 by auto.
         forward He2 by unfolds; auto.
+        forward He2 by auto.
         destruct He2 as [Hok [_ _]].
         specialize (Hok H8).
         now right.
     - intros Heval. inv Heval.
       + unfold triple in He1.
-        specialize (He1 s1a s1b s1c 0 s s1).
+        specialize (He1 s1a s1b s1c 0 s s1 r).
+        unfold aand in He1.
         forward He1 by auto.
         forward He1 by unfolds; auto.
+        forward He1 by auto.
         destruct He1 as [_ [Her _]].
         specialize (Her H8).
         now left.
       + unfold triple in He2.
-        specialize (He2 s2a s2b s2c 0 s s1).
+        specialize (He2 s2a s2b s2c 0 s s1 r).
+        unfold aand in He2.
         forward He2 by auto.
         forward He2 by unfolds; auto.
+        forward He2 by auto.
         destruct He2 as [_ [Her _]].
         specialize (Her H8).
         now right.
     - intros Hdiv. inv Hdiv.
       + unfold triple in He1.
-        specialize (He1 s1a s1b s1c 0 s s1).
+        specialize (He1 s1a s1b s1c 0 s s1 r).
+        unfold aand in He1.
         forward He1 by auto.
         forward He1 by unfolds; auto.
+        forward He1 by auto.
         destruct He1 as [_ [_ Hnt]].
         specialize (Hnt H5).
         now left.
       + unfold triple in He2.
-        specialize (He2 s2a s2b s2c 0 s s1).
+        specialize (He2 s2a s2b s2c 0 s s1 r).
+        unfold aand in He2.
         forward He2 by auto.
         forward He2 by unfolds; auto.
+        forward He2 by auto.
         destruct He2 as [_ [_ Hnt]].
         specialize (Hnt H5).
         now right.
   Qed.
-
-    (* TODO let *)
-
-    (* TODO call *)
-    (* | f_pcall : forall y b f c r x d,
-      fenv f = Some (fn y b) ->
-      forward (LR d r) (pcall f x) (ok_only (fun r => aand s (fun s => r = c))) *)
 
 End Bigstep.
 
