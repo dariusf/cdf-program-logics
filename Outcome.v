@@ -9,6 +9,12 @@ Local Open Scope core_scope.
 Local Open Scope nat_scope.
 Local Open Scope list_scope.
 
+Module Values.
+  Definition t := Z.
+End Values.
+Module Store := MakeStore (Values).
+Import Store.
+
 Section Outcome.
 
 Definition measure := store -> nat.

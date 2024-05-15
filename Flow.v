@@ -8,6 +8,12 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
+Module Values.
+  Definition t := Z.
+End Values.
+Module Store := MakeStore (Values).
+Import Store.
+
 Module Biabduction.
 
   (* like the member predicate. or modulo equivalence? *)

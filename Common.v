@@ -6,10 +6,15 @@ Local Open Scope string_scope.
 
 Definition ident := string.
 
-Section Store.
-  Definition store : Type := ident -> option Z.
+Module Type VAL.
+  Parameter t : Set.
+End VAL.
+
+Module MakeStore (V : VAL).
+
+  Definition store : Type := ident -> option V.t.
   Definition sempty : store := (fun _ => None).
-  Definition supdate (x: ident) (v: Z) (s: store) : store :=
+  Definition supdate (x: ident) (v: V.t) (s: store) : store :=
     fun y => if string_dec x y then Some v else s y.
 
   Lemma supdate_same: forall l v h, (supdate l v h) l = Some v.
@@ -95,7 +100,8 @@ Section Store.
     apply H.
     assumption.
   Qed.
-End Store.
+
+End MakeStore.
 
 Section Well_founded_Nat.
 
