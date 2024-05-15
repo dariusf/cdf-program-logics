@@ -290,7 +290,7 @@ End SemanticsExamples.
 
 (* End StagesShallow. *)
 
-Section DeepRules.
+(** * Hoare rules *)
 
   (* forward rules say how to produce a staged formula from a program *)
   Inductive forward : expr -> flow -> Prop :=
@@ -540,4 +540,52 @@ Section DeepRules.
       Qed.
     End SpecExamples. *)
 
-End DeepRules.
+(** * Semantic flows *)
+
+  Definition triple (pre:flow) (e:expr) (spec:flow) :=
+    forall s1 h1 s2 h2 r sr s0 h0 r0 s3 h3,
+        pre s0 h0 s1 h1 r0 ->
+        bigstep s1 h1 e s2 h2 r ->
+        spec s0 h0 s3 h3 sr ->
+        compatible sr r /\ h2 = h3.
+    
+    (*
+      {pre} e {spec}
+      s,h |= pre
+      s,h,e -> s1,h1,v
+      -------------------
+      s,h,e ~> s1,h1,v |= spec
+    *)
+  (* . *)
+
+  Lemma fw_const1 : forall p n,
+    triple p (pconst n) (p ;; ens (fun res => (res = n) //\\ emp)).
+  Proof.
+    intros.
+    unfolds.
+    intros.
+    inv H0.
+    split.
+    - unfold seq.
+    unfolds in H1.
+    destr H1.
+    unfolds in H5.
+    destr H5.
+    unfolds in H11.
+    unfolds.
+    destruct sr.
+    subst.
+    inj H6.
+    easy.
+    - unfolds in H1.
+    destr H1.
+    unfolds in H5.
+    (* TODO need determinism to conclude that the heap is the same *)
+    destr H5.
+    unfolds in H11.
+    destr H11.
+    subst.
+    admit.
+    (* TODO substore then needs simulation relation *)
+Abort.
+  (* Qed. *)
