@@ -290,6 +290,8 @@ End SemanticsExamples.
 
 (* End StagesShallow. *)
 
+Section DeepRules.
+
   (* forward rules say how to produce a staged formula from a program *)
   Inductive forward : expr -> flow -> Prop :=
     | fw_const: forall n,
@@ -318,222 +320,224 @@ End SemanticsExamples.
         (ens (fun r => (r = v) //\\ contains l v))) *)
   .
 
-Module ForwardExamples.
+  Section ForwardExamples.
 
-  (* let x = 1 in x *)
-  Example ex_forward_let1:
-    exists st, forward (plet "x" (pconst 1) (pvar "x")) st.
+    (* let x = 1 in x *)
+    Example ex_forward_let1:
+      exists st, forward (plet "x" (pconst 1) (pvar "x")) st.
+    Proof.
+      eexists.
+      eapply fw_let.
+      eapply fw_const.
+      eapply fw_var.
+      eauto.
+      Unshelve.
+      exact 3. (* anything is allowed it seems *)
+    Qed.
+
+    (* Check ex_intro. *)
+    (* ex_intro : forall (A : Type) (P : A -> Prop) (x : A), P x -> exists y, P y *)
+    (* Print ex_forward_let1. *)
+      (* (fun st : ...) is P *)
+      (* (fexists "x" ...) is the witness x, which is what we are after *)
+      (* (fw_let "x" ...) is the existential stmt P x, which is a derivation using the rules above, whose type includes the witness *)
+
+  End ForwardExamples.
+
+  Definition compatible r1 r2 :=
+  match (r1, r2) with
+  | (norm r3, enorm r4) => r3 = r4
+  end.
+
+  Definition wellformed (f:flow) s1 h1 s2 h2 r :=
+  f s1 h1 s2 h2 r -> substore s1 s2.
+
+  Lemma replace_ret_wellformed : forall x f s1 h1 s2 h2 v,
+  Some v = s1 x ->
+  wellformed f s1 h1 s2 h2 (norm v) ->
+  (wellformed (replace_ret x f)) s1 h1 s2 h2 (norm v).
   Proof.
-    eexists.
-    eapply fw_let.
-    eapply fw_const.
-    eapply fw_var.
-    eauto.
-    Unshelve.
-    exact 3. (* anything is allowed it seems *)
+  unfold wellformed.
+  intros.
+  unfold replace_ret in H1; destr H1.
+  apply H0.
+  congruence.
   Qed.
 
-  (* Check ex_intro. *)
-  (* ex_intro : forall (A : Type) (P : A -> Prop) (x : A), P x -> exists y, P y *)
-  (* Print ex_forward_let1. *)
-    (* (fun st : ...) is P *)
-    (* (fexists "x" ...) is the witness x, which is what we are after *)
-    (* (fw_let "x" ...) is the existential stmt P x, which is a derivation using the rules above, whose type includes the witness *)
+  (* we could prove _wellformed lemmas for all req, ens, etc., but currently we're doing it only for the structures generated from the forward rules *)
 
-End ForwardExamples.
-
-Definition compatible r1 r2 :=
-match (r1, r2) with
-| (norm r3, enorm r4) => r3 = r4
-end.
-
-Definition wellformed (f:flow) s1 h1 s2 h2 r :=
-f s1 h1 s2 h2 r -> substore s1 s2.
-
-Lemma replace_ret_wellformed : forall x f s1 h1 s2 h2 v,
-Some v = s1 x ->
-wellformed f s1 h1 s2 h2 (norm v) ->
-(wellformed (replace_ret x f)) s1 h1 s2 h2 (norm v).
-Proof.
-unfold wellformed.
-intros.
-unfold replace_ret in H1; destr H1.
-apply H0.
-congruence.
-Qed.
-
-(* we could prove _wellformed lemmas for all req, ens, etc., but currently we're doing it only for the structures generated from the forward rules *)
-
-Lemma forward_wellformed : forall e f s1 h1 s2 h2 r,
-forward e f -> (wellformed f) s1 h1 s2 h2 r.
-Proof.
-intros e f s1 h1 s2 h2 r H.
-revert s1 h1 s2 h2 r.
-induction H; intros.
-- unfold wellformed; intros.
-  unfold ens in H; destr H; subst.
-  apply substore_refl.
-- unfold wellformed; intros.
-  unfold ens in H; destr H; subst.
-  apply substore_refl.
--
-  unfold wellformed; intros.
-  unfold fexists in H2. destruct H2 as [? [v H5]]. subst.
-  unfold seq in H5. destruct H5 as [s3 [h3 [? [Hrr Hf2]]]]. subst.
-
-  (* introduce well-formed lemma on replace_ret *)
-  pose proof (replace_ret_wellformed x f1 (supdate x v s1) h1 s3 h3 v) as Hret.
-  rewrite supdate_same in Hret.
-  assert (Some v = Some v) as triv. reflexivity.
-  specialize (Hret triv); clear triv.
-
-  (* assuming f1 is wf using the IH, replace_ret f1 is wf *)
-  specialize (IHforward1 (supdate x v s1) h1 s3 h3 (norm v)).
-  specialize (Hret IHforward1).
-  unfold wellformed in Hret.
-  specialize (Hret Hrr).
-
-  unfold wellformed in IHforward2.
-  specialize (IHforward2 s3 h3 s2 h2 r Hf2).
-
-  unfold wellformed in IHforward1.
-  unfold replace_ret in Hrr; destruct Hrr as [? [? Hf1]]; rewrite supdate_same in H1; inj H1.
-  specialize (IHforward1 Hf1).
-  assert (substore s1 (supdate x v s1)).
-  apply substore_extension; ok.
-  apply substore_trans with (s2 := supdate x v s1); ok.
-  apply substore_trans with (s2 := s3); ok.
-Qed.
-
-(* {ens emp} e {\phi}, 
-SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
-[S, h, e] -----> [S2, h2, R2], R2!=\bot, 
-such that: 
-\exists (check, s3, h3, R3) \in SH, s3 \subset s2, h3 \subset h2, R2=R1 *)
-  Theorem soundness :
-  forall se1 he1 e se2 he2 re (**) f ss1 hs1 ss2 hs2 rs,
-    bigstep se1 he1 e se2 he2 re ->
-    substore se1 ss1 ->
-    (* he1 = hs1 -> *)
-    forward e f ->
-    f ss1 hs1 ss2 hs2 rs ->
-    substore se2 ss2
-    (* /\ he2 = hs2 *)
-    /\ compatible rs re.
+  Lemma forward_wellformed : forall e f s1 h1 s2 h2 r,
+  forward e f -> (wellformed f) s1 h1 s2 h2 r.
   Proof.
-    intros se1 he1 e se2 he2 re
-            f ss1 hs1 ss2 hs2 rs
-            Hb.
-    revert f ss1 hs1 ss2 hs2 rs.
-    induction Hb;
-    intros f ss1 hs1 ss2 hs2 rs;
-    intros Hsub Hf Hs.
-    - (* var. the proof comes down to the fact that both spec and program read
-          s(x) and leave the heap unchanged. *)
+  intros e f s1 h1 s2 h2 r H.
+  revert s1 h1 s2 h2 r.
+  induction H; intros.
+  - unfold wellformed; intros.
+    unfold ens in H; destr H; subst.
+    apply substore_refl.
+  - unfold wellformed; intros.
+    unfold ens in H; destr H; subst.
+    apply substore_refl.
+  -
+    unfold wellformed; intros.
+    unfold fexists in H2. destruct H2 as [? [v H5]]. subst.
+    unfold seq in H5. destruct H5 as [s3 [h3 [? [Hrr Hf2]]]]. subst.
+
+    (* introduce well-formed lemma on replace_ret *)
+    pose proof (replace_ret_wellformed x f1 (supdate x v s1) h1 s3 h3 v) as Hret.
+    rewrite supdate_same in Hret.
+    assert (Some v = Some v) as triv. reflexivity.
+    specialize (Hret triv); clear triv.
+
+    (* assuming f1 is wf using the IH, replace_ret f1 is wf *)
+    specialize (IHforward1 (supdate x v s1) h1 s3 h3 (norm v)).
+    specialize (Hret IHforward1).
+    unfold wellformed in Hret.
+    specialize (Hret Hrr).
+
+    unfold wellformed in IHforward2.
+    specialize (IHforward2 s3 h3 s2 h2 r Hf2).
+
+    unfold wellformed in IHforward1.
+    unfold replace_ret in Hrr; destruct Hrr as [? [? Hf1]]; rewrite supdate_same in H1; inj H1.
+    specialize (IHforward1 Hf1).
+    assert (substore s1 (supdate x v s1)).
+    apply substore_extension; ok.
+    apply substore_trans with (s2 := supdate x v s1); ok.
+    apply substore_trans with (s2 := s3); ok.
+  Qed.
+
+  (* {ens emp} e {\phi}, 
+  SH = { (check, s1, h1, R1)   |  [check, S, h] ~~>m [check, s1, h2, R1] |= \phi }, and 
+  [S, h, e] -----> [S2, h2, R2], R2!=\bot, 
+  such that: 
+  \exists (check, s3, h3, R3) \in SH, s3 \subset s2, h3 \subset h2, R2=R1 *)
+    Theorem soundness :
+    forall se1 he1 e se2 he2 re (**) f ss1 hs1 ss2 hs2 rs,
+      bigstep se1 he1 e se2 he2 re ->
+      substore se1 ss1 ->
+      (* he1 = hs1 -> *)
+      forward e f ->
+      f ss1 hs1 ss2 hs2 rs ->
+      substore se2 ss2
+      (* /\ he2 = hs2 *)
+      /\ compatible rs re.
+    Proof.
+      intros se1 he1 e se2 he2 re
+              f ss1 hs1 ss2 hs2 rs
+              Hb.
+      revert f ss1 hs1 ss2 hs2 rs.
+      induction Hb;
+      intros f ss1 hs1 ss2 hs2 rs;
+      intros Hsub Hf Hs.
+      - (* var. the proof comes down to the fact that both spec and program read
+            s(x) and leave the heap unchanged. *)
+        inv Hf.
+        unfold ens in Hs; destr Hs. subst.
+        unfold emp in H9.
+        unfold compatible.
+        heap.
+        unfold substore in Hsub.
+        symmetry in H.
+        specialize (Hsub v x H).
+        congruence.
+      -
+        inv Hf.
+        unfold ens in Hs; destr Hs; subst.
+        unfold compatible.
+        unfold pureconj in H6.
+        intuition auto.
+
+      -
+      (* we have an IH for each subexpr *)
+      (* v is the intermediate result of evaluating e1 *)
+      (* r is the final result *)
+      (* invp Hf [H2 H4]. *)
       inv Hf.
-      unfold ens in Hs; destr Hs. subst.
-      unfold emp in H9.
-      unfold compatible.
-      heap.
-      unfold substore in Hsub.
-      symmetry in H.
-      specialize (Hsub v x H).
-      congruence.
-    -
-      inv Hf.
-      unfold ens in Hs; destr Hs; subst.
-      unfold compatible.
-      unfold pureconj in H6.
-      intuition auto.
-
-    -
-    (* we have an IH for each subexpr *)
-    (* v is the intermediate result of evaluating e1 *)
-    (* r is the final result *)
-    (* invp Hf [H2 H4]. *)
-    inv Hf.
-    (* invp Hf [ | |Hff1 Hff2]. *)
-    (* inversion Hf as [ Hy Hz |  |Hff1 Hff2 Hz]. subst; clear Hf. *)
-    (* the spec is of the form ex x. f1[x/r];f2 *)
-    unfold fexists in Hs. destruct Hs as [Hnotin [v1 Hseq]].
-    (* see how it evaluates *)
-    unfold seq in Hseq. destruct Hseq as [s3 [h3 [? [Hrr ?]]]].
-    unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]].
+      (* invp Hf [ | |Hff1 Hff2]. *)
+      (* inversion Hf as [ Hy Hz |  |Hff1 Hff2 Hz]. subst; clear Hf. *)
+      (* the spec is of the form ex x. f1[x/r];f2 *)
+      unfold fexists in Hs. destruct Hs as [Hnotin [v1 Hseq]].
+      (* see how it evaluates *)
+      unfold seq in Hseq. destruct Hseq as [s3 [h3 [? [Hrr ?]]]].
+      unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]].
 
 
-    (* OLD NOW FIXED now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
+      (* OLD NOW FIXED now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
 
-    (* OLD NOW FIXED the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
+      (* OLD NOW FIXED the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
 
-    (* try to meet in the middle *)
-    (* apply IHHb2. *)
-    (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
-    (* easy. *)
-    (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
-    pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha.
-    specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s3 h3 (norm H10) Hha H2 H13).
-    destruct IHHb1 as [IH1 IH2].
-    (* we know that evaluation of e1 preserves substore *)
+      (* try to meet in the middle *)
+      (* apply IHHb2. *)
+      (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
+      (* easy. *)
+      (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
+      pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha.
+      specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s3 h3 (norm H10) Hha H2 H13).
+      destruct IHHb1 as [IH1 IH2].
+      (* we know that evaluation of e1 preserves substore *)
 
-    (* now try to use IH2 *)
-    specialize (IHHb2 f2 s3 h3 ss2 hs2 rs).
-    apply IHHb2; auto.
-    apply (substore_extension_left _ s1 s3 v x IH1).
-    unfold compatible in IH2.
-    rewrite <- IH2.
-    rewrite H9.
-    rewrite supdate_same in H9.
-    rewrite supdate_same.
-    (* need to know substore (supdate x v1 ss1) H6 is preserved by all spec/f eval *)
-    (* but how to know that, as we can give any f *)
-    pose proof (forward_wellformed _ _ (supdate x v1 ss1) hs1 s3 h3 (norm H10) H2) as Hf1wf.
-    unfold wellformed in Hf1wf.
+      (* now try to use IH2 *)
+      specialize (IHHb2 f2 s3 h3 ss2 hs2 rs).
+      apply IHHb2; auto.
+      apply (substore_extension_left _ s1 s3 v x IH1).
+      unfold compatible in IH2.
+      rewrite <- IH2.
+      rewrite H9.
+      rewrite supdate_same in H9.
+      rewrite supdate_same.
+      (* need to know substore (supdate x v1 ss1) H6 is preserved by all spec/f eval *)
+      (* but how to know that, as we can give any f *)
+      pose proof (forward_wellformed _ _ (supdate x v1 ss1) hs1 s3 h3 (norm H10) H2) as Hf1wf.
+      unfold wellformed in Hf1wf.
 
-    (* assert (Hpreserve : substore (supdate x v1 ss1) s3). admit. *)
-    (* apply Hf1wf. *)
-    (* unfold substore in Hpreserve. *)
-    (* apply Hpreserve. *)
-    apply Hf1wf.
-    ok.
-    rewrite supdate_same.
-    reflexivity.
+      (* assert (Hpreserve : substore (supdate x v1 ss1) s3). admit. *)
+      (* apply Hf1wf. *)
+      (* unfold substore in Hpreserve. *)
+      (* apply Hpreserve. *)
+      apply Hf1wf.
+      ok.
+      rewrite supdate_same.
+      reflexivity.
 
-(* https://xavierleroy.org/courses/EUTypes-2019/slides.pdf *)
+  (* https://xavierleroy.org/courses/EUTypes-2019/slides.pdf *)
 
-  Qed.
+    Qed.
 
-(* Module SpecExamples.
-  Example ex_spec_return_anything: exists x,
-    sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm x] |= req emp.
-  Proof.
-    exists 1.
-    apply sem_req with (s1 := sempty).
-    auto.
-    exists hempty.
-    repeat split; heap.
-  Qed.
+    (* Module SpecExamples.
+      Example ex_spec_return_anything: exists x,
+        sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm x] |= req emp.
+      Proof.
+        exists 1.
+        apply sem_req with (s1 := sempty).
+        auto.
+        exists hempty.
+        repeat split; heap.
+      Qed.
 
-  Example ex_spec_ens_1:
-    sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm 1] |=
-      ens (fun r => (r = 1) //\\ emp).
-  Proof.
-    apply sem_ens with (s := sempty).
-    exists hempty.
-    repeat split; heap.
-  Qed.
+      Example ex_spec_ens_1:
+        sem[ true, sempty, hempty]=>[ true, sempty, hempty, norm 1] |=
+          ens (fun r => (r = 1) //\\ emp).
+      Proof.
+        apply sem_ens with (s := sempty).
+        exists hempty.
+        repeat split; heap.
+      Qed.
 
-  Example ex_spec_seq: forall x,
-    sem[ true, sempty, hupdate x 1 hempty]=>[ true, sempty, hupdate x 1 hempty, norm 2] |= (req (contains x 1);; ens (fun r => (r = 2) //\\ contains x 1)).
-  Proof.
-    intros.
-    apply sem_seq with (s1 := sempty) (h2 := hempty) (r := norm 3).
-    - apply sem_req with (s1 := sempty).
-    exists (hupdate x 1 hempty).
-    repeat split.
-    heap.
-    heap.
-    - apply sem_ens with (s := sempty).
-    exists (hupdate x 1 hempty).
-    repeat split; heap.
-  Qed.
-End SpecExamples. *)
+      Example ex_spec_seq: forall x,
+        sem[ true, sempty, hupdate x 1 hempty]=>[ true, sempty, hupdate x 1 hempty, norm 2] |= (req (contains x 1);; ens (fun r => (r = 2) //\\ contains x 1)).
+      Proof.
+        intros.
+        apply sem_seq with (s1 := sempty) (h2 := hempty) (r := norm 3).
+        - apply sem_req with (s1 := sempty).
+        exists (hupdate x 1 hempty).
+        repeat split.
+        heap.
+        heap.
+        - apply sem_ens with (s := sempty).
+        exists (hupdate x 1 hempty).
+        repeat split; heap.
+      Qed.
+    End SpecExamples. *)
+
+End DeepRules.
