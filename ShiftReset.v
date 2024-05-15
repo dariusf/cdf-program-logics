@@ -8,50 +8,32 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
-Section expr.
-  (* http://adam.chlipala.net/cpdt/html/Hoas.html *)
-  Variable var : Set.
-
-  Inductive expr : Set :=
-    | eint : Z -> expr
-    | elamb : (var -> expr) -> expr
-    | evar : ident -> expr
-    | elet : ident -> expr -> expr
-    | eif : ident -> expr -> expr
-    | eapp : ident -> expr.
-
-  (* Inductive is_val : expr -> Prop :=
-    | vint : forall n, is_val (eint n)
-    | vlamb : forall b, is_val (elamb b). *)
-
-End expr.
-
-Definition Expr := forall v, expr v.
+Inductive expr : Set :=
+  | eint : Z -> expr
+  | elamb : (ident -> expr) -> expr
+  | evar : ident -> expr
+  | elet : ident -> expr -> expr
+  | eif : ident -> expr -> expr
+  | eapp : ident -> expr.
 
 Module Values.
-  Definition t := Expr.
+  Definition t := expr.
 End Values.
-(* Module Store := MakeStore (Values). *)
-(* Import Store. *)
+Module Store := MakeStore (Values).
+Import Store.
 
-(*
-  - We can't have module types inside sections https://github.com/coq/coq/issues/18307, so now we have to move the module definition out and thread all the stupid v parameters
-  - Either way we can't have expressions as store values due to the parameter
-  - What if we used a separate val type? Now we have mutual recursion and no induction principles http://adam.chlipala.net/cpdt/html/InductiveTypes.html
-*)
-
-Inductive is_val : forall v, expr v -> Prop :=
-  | vint : forall v n, is_val v (eint v n)
-  | vlamb : forall (v:Set) (b:v -> expr v), is_val v (elamb v b).
+Inductive is_val : expr -> Prop :=
+  | vint : forall n, is_val (eint n)
+  | vlamb : forall b, is_val (elamb b).
 
 Inductive eresult : Type :=
   | resshift : eresult (* TODO *)
   | resbot : eresult
-  | resnorm : forall v, expr v -> eresult.
+  | resnorm : expr -> eresult.
 
 Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
-(* Inductive bigstep : forall v, store -> heap -> expr v -> store -> heap -> eresult -> Prop :=
+(* Inductive bigstep : forall v, store -> heap -> expr -> store -> heap -> eresult -> Prop :=
   | eval_var : forall s h x v,
     Some v = s x ->
     eval[ s, h, evar x ]=>[ s, h, resnorm v]
