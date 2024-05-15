@@ -12,3 +12,4 @@ Separation2.v
 Common.v
 Tactics.v
 Outcome.v
+ShiftReset.v
