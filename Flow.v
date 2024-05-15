@@ -8,12 +8,6 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
-Module Values.
-  Definition t := Z.
-End Values.
-Module Store := MakeStore (Values).
-Import Store.
-
 Module Biabduction.
 
   (* like the member predicate. or modulo equivalence? *)
@@ -71,6 +65,8 @@ Module Flow3.
   .
 
   Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
+
+  Definition store := store Z.
 
   Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     | eval_pvar : forall s h x v,
@@ -518,7 +514,7 @@ such that:
       (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
       (* easy. *)
       (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
-      pose proof (substore_extension_trans s ss1 v1 x Hsub Hnotin) as Hha.
+      pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha.
       specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s3 h3 (norm H10) Hha H2 H13).
       destruct IHHb1 as [IH1 IH2].
       (* we know that evaluation of e1 preserves substore *)
@@ -526,7 +522,7 @@ such that:
       (* now try to use IH2 *)
       specialize (IHHb2 f2 s3 h3 ss2 hs2 rs).
       apply IHHb2; auto.
-      apply (substore_extension_left s1 s3 v x IH1).
+      apply (substore_extension_left _ s1 s3 v x IH1).
       unfold compatible in IH2.
       rewrite <- IH2.
       rewrite H9.

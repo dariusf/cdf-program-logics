@@ -17,19 +17,12 @@ Inductive expr : Type :=
   (* https://chargueraud.org/research/2009/ln/main.pdf *)
   | eapp (f:ident) (x:ident)
   | elet (x:ident) (e1:expr) (e2:expr)
-  (* TODO *)
-  (* | eassert (x:assertion) *)
+  | eassert (x:assertion)
   | eif (x:ident) (e1:expr) (e2:expr)
   | eshift (e:ident)
   | ereset (e:expr).
 
-(* Print assertion. *)
-
-Module Values.
-  Definition t := expr.
-End Values.
-Module Store := MakeStore (Values).
-Import Store.
+Definition store := store expr.
 
 Inductive is_val : expr -> Prop :=
   | vint : forall n, is_val (eint n)

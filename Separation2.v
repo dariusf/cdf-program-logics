@@ -6,12 +6,6 @@ From CDF Require Import Common.
 
 Local Open Scope Z_scope.
 
-Module Values.
-  Definition t := Z.
-End Values.
-Module Store := MakeStore (Values).
-Import Store.
-
 (** * 1. Memory heaps *)
 
 (** A memory heap is a partial function from addresses (memory locations) 
@@ -236,7 +230,7 @@ Qed.
 
 (** * 2. Assertions for separation logic *)
 
-Definition assertion : Type := store -> heap -> Prop.
+Definition assertion : Type := store Z -> heap -> Prop.
 
 (** Implication (entailment). *)
 

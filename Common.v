@@ -6,20 +6,17 @@ Local Open Scope string_scope.
 
 Definition ident := string.
 
-Module Type VAL.
-  Parameter t : Set.
-End VAL.
+Section Store.
 
-Module MakeStore (V : VAL).
-
-  Definition store : Type := ident -> option V.t.
-  Definition sempty : store := (fun _ => None).
-  Definition supdate (x: ident) (v: V.t) (s: store) : store :=
+  Definition store (A:Type) : Type := ident -> option A.
+  Definition sempty {A:Type} : store A := (fun _ => None).
+  Definition supdate {A:Type} (x: ident) (v: A) (s: store A) : store A :=
     fun y => if string_dec x y then Some v else s y.
-  Definition sremove (x: ident) (s: store) : store :=
+  Definition sremove {A:Type} (x: ident) (s: store A) : store A :=
     fun y => if string_dec x y then None else s y.
 
-  Lemma sremove_any: forall l s, (sremove l s) l = None.
+  Lemma sremove_any: forall l A (s : store A),
+    (sremove l s) l = None.
   Proof.
     intros; cbn.
     unfold sremove.
@@ -28,14 +25,16 @@ Module MakeStore (V : VAL).
     easy.
   Qed.
 
-  Lemma supdate_same: forall l v h, (supdate l v h) l = Some v.
+  Lemma supdate_same: forall A (h:store A) v l,
+    (supdate l v h) l = Some v.
   Proof.
     intros; cbn.
     unfold supdate.
     destruct (string_dec l l); congruence.
   Qed.
 
-  Lemma supdate_other: forall l v h l', l <> l' -> (supdate l v h) l' = h l'.
+  Lemma supdate_other: forall A (h:store A) l v l',
+    l <> l' -> (supdate l v h) l' = h l'.
   Proof.
     intros; cbn.
     unfold supdate.
@@ -43,10 +42,10 @@ Module MakeStore (V : VAL).
   Qed.
 
   (* s1 <= s2 *)
-  Definition substore (s1 s2 : store) :=
+  Definition substore {A:Type} (s1 s2 : store A) :=
     forall v x, s1 x = Some v -> s2 x = Some v.
 
-  Lemma substore_notin : forall (s:store) v x y,
+  Lemma substore_notin : forall A (s:store A) v x y,
     s x = None -> s y = Some v -> x <> y.
   Proof.
     intros.
@@ -56,7 +55,7 @@ Module MakeStore (V : VAL).
     congruence.
   Qed.
 
-  Lemma substore_extension : forall s2 v x,
+  Lemma substore_extension : forall A (s2:store A) v x,
     s2 x = None -> substore s2 (supdate x v s2).
   Proof.
     intros.
@@ -67,13 +66,13 @@ Module MakeStore (V : VAL).
     apply substore_notin with (s:=s2) (v:=v0); auto.
   Qed.
 
-  Lemma substore_refl : forall s1,
+  Lemma substore_refl : forall A (s1:store A),
     substore s1 s1.
   Proof.
     now unfold substore.
   Qed.
 
-  Lemma substore_trans : forall s1 s2 s3,
+  Lemma substore_trans : forall A (s1 s2 s3: store A),
     substore s1 s2 -> substore s2 s3 -> substore s1 s3.
   Proof.
     intros.
@@ -84,7 +83,7 @@ Module MakeStore (V : VAL).
     now apply H.
   Qed.
 
-  Lemma substore_extension_trans : forall s1 s2 v x,
+  Lemma substore_extension_trans : forall A (s1 s2: store A) v x,
     substore s1 s2 -> s2 x = None -> substore s1 (supdate x v s2).
   Proof.
     intros.
@@ -93,7 +92,7 @@ Module MakeStore (V : VAL).
     now apply substore_trans with (s2 := s2).
   Qed.
 
-  Lemma substore_extension_left : forall s1 s2 v x,
+  Lemma substore_extension_left : forall A (s1 s2:store A) v x,
     substore s1 s2 ->
     s2 x = Some v ->
     substore (supdate x v s1) s2.
@@ -112,7 +111,7 @@ Module MakeStore (V : VAL).
     assumption.
   Qed.
 
-End MakeStore.
+End Store.
 
 Section Well_founded_Nat.
 
