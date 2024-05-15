@@ -9,6 +9,7 @@ Monads.v
 Trace.v
 Flow.v
 Separation2.v
+Biabduction.v
 Common.v
 Tactics.v
 Outcome.v
