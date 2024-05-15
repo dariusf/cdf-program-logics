@@ -8,13 +8,22 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
-Inductive expr : Set :=
-  | eint : Z -> expr
-  | elamb : (ident -> expr) -> expr
-  | evar : ident -> expr
-  | elet : ident -> expr -> expr
-  | eif : ident -> expr -> expr
-  | eapp : ident -> expr.
+Inductive expr : Type :=
+  | eint (i:Z)
+  | elamb (x:ident) (e:expr)
+  | evar (x:ident)
+  (* | efree (v:ident) *)
+  (* | ebound (i:nat) *)
+  (* https://chargueraud.org/research/2009/ln/main.pdf *)
+  | eapp (f:ident) (x:ident)
+  | elet (x:ident) (e1:expr) (e2:expr)
+  (* TODO *)
+  (* | eassert (x:assertion) *)
+  | eif (x:ident) (e1:expr) (e2:expr)
+  | eshift (e:ident)
+  | ereset (e:expr).
+
+(* Print assertion. *)
 
 Module Values.
   Definition t := expr.
@@ -24,35 +33,65 @@ Import Store.
 
 Inductive is_val : expr -> Prop :=
   | vint : forall n, is_val (eint n)
-  | vlamb : forall b, is_val (elamb b).
+  | vlamb : forall x b, is_val (elamb x b).
 
 Inductive eresult : Type :=
-  | resshift : eresult (* TODO *)
-  | resbot : eresult
-  | resnorm : expr -> eresult.
+  | resshift (ve:expr) (vl:expr)
+  | resbot
+  | resnorm (v:expr).
 
 Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
-(* Inductive bigstep : forall v, store -> heap -> expr -> store -> heap -> eresult -> Prop :=
+Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
+
+  | eval_value : forall s h v,
+    is_val v ->
+    eval[ s, h, v ]=>[ s, h, resnorm v ]
+
   | eval_var : forall s h x v,
     Some v = s x ->
-    eval[ s, h, evar x ]=>[ s, h, resnorm v]
-  (* | eval_const : forall s h x,
-    eval[ s, h, pconst x ] => [ s, h, enorm x] *)
-  | eval_plet : forall x e1 e2 v s h h2 s2 s1 h1 r,
-    eval[ s, h, e1 ] => [ s1, h1, enorm v] ->
-    eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r] ->
-    eval[ s, h, plet x e1 e2 ] => [ s2, h2, r ]
-  (* | eval_pref : forall x s (h:heap) l,
-    h l = None ->
-    eval[ s, h, pref x ] => [ s, hupdate l (s x) h, enorm l]
-  | eval_deref : forall x s (h:heap) v,
-    h (s x) = Some v ->
-    eval[ s, h, pderef x ] => [ s, h, enorm v]
-  | eval_assign : forall x1 x2 s h,
-    eval[ s, h, passign x1 x2 ] => [ s, hupdate (s x1) (s x2) h, enorm 0] *)
+    eval[ s, h, evar x ]=>[ s, h, resnorm v ]
 
-where " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " := (bigstep s h e s1 h1 r). *)
+  | eval_app : forall f x y e v s h s1 h1 r,
+    Some (elamb y e) = s f ->
+    Some v = s x ->
+    eval[ supdate f (elamb y e) (supdate y v s1), h, e ] => [ s1, h1, r ] ->
+    eval[ s, h, eapp f x ] => [ s1, h1, r ]
+
+  | eval_let : forall x e1 e2 v s h h2 s2 s1 h1 r,
+    eval[ s, h, e1 ] => [ s1, h1, resnorm v ] ->
+    eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r ] ->
+    eval[ s, h, elet x e1 e2 ] => [ sremove x s2, h2, r ]
+
+  | eval_ift : forall x e1 e2 s h s1 h1 r,
+    Some (eint 0) = s x ->
+    eval[ s, h, e1 ] => [ s1, h1, r ] ->
+    eval[ s, h, eif x e1 e2 ] => [ s1, h1, r ]
+
+  | eval_iff : forall x e1 e2 s h s1 h1 r,
+    Some (eint 0) <> s x ->
+    eval[ s, h, e2 ] => [ s1, h1, r ] ->
+    eval[ s, h, eif x e1 e2 ] => [ s1, h1, r ]
+
+  | eval_shift : forall x e b s h y,
+    Some (elamb x e) = s b ->
+    eval[ s, h, eshift b ] => [ s, h, resshift (elamb x e) (elamb y (evar y)) ]
+
+  | eval_letshift : forall x e1 e2 s h s1 h1 r el vl z f,
+    eval[ s, h, e1 ] => [ s1, h1, resshift el vl ] ->
+    r = resshift el (elamb z (elet z (elet f vl (eapp f z)) e2)) ->
+    eval[ s, h, elet x e1 e2 ] => [ s1, h1, r ]
+
+  | eval_resetshift : forall e s h s1 h1 s2 h2 r el vl f x,
+    eval[ s, h, e ] => [ s1, h1, resshift el vl ] ->
+    eval[ s, h, ereset (elet f el (elet x vl (eapp f x))) ] => [ s2, h2, r ] ->
+    eval[ s, h, ereset e ] => [ s2, h2, r ]
+
+  | eval_resetval : forall e s h s1 h1 v,
+    eval[ s, h, e ] => [ s1, h1, resnorm v ] ->
+    eval[ s, h, ereset e ] => [ s1, h1, resnorm v ]
+
+where " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " := (bigstep s h e s1 h1 r).
 
 
 Section ProgramExamples.

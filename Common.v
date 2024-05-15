@@ -16,6 +16,17 @@ Module MakeStore (V : VAL).
   Definition sempty : store := (fun _ => None).
   Definition supdate (x: ident) (v: V.t) (s: store) : store :=
     fun y => if string_dec x y then Some v else s y.
+  Definition sremove (x: ident) (s: store) : store :=
+    fun y => if string_dec x y then None else s y.
+
+  Lemma sremove_any: forall l s, (sremove l s) l = None.
+  Proof.
+    intros; cbn.
+    unfold sremove.
+    destruct (string_dec l l).
+    auto.
+    easy.
+  Qed.
 
   Lemma supdate_same: forall l v h, (supdate l v h) l = Some v.
   Proof.
