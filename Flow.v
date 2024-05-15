@@ -70,119 +70,119 @@ Definition postcond := Z -> assertion.
 
 Module StagesDeep.
 
-Inductive stages : Type :=
-  | req : precond -> stages
-  | ens : postcond -> stages
-  | seq : stages -> stages -> stages
-  (* | fexists : (Z -> stages) -> stages. *)
-  | fexists : ident -> stages -> stages.
+  Inductive stages : Type :=
+    | req : precond -> stages
+    | ens : postcond -> stages
+    | seq : stages -> stages -> stages
+    (* | fexists : (Z -> stages) -> stages. *)
+    | fexists : ident -> stages -> stages.
 
-Definition flow := Z -> stages.
+  Definition flow := Z -> stages.
 
-Infix ";;" := seq (at level 80, right associativity).
+  Infix ";;" := seq (at level 80, right associativity).
 
-(* Fixpoint replace_ret x f :=
-  match f with
-  | ens q => ens (fun r s h => ((r = s x) //\\ q (s x)) s h)
-  | req p => f
-  | seq a b => seq a (replace_ret x b)
-  | fexists i f => fexists i (replace_ret x f)
-  end. *)
+  (* Fixpoint replace_ret x f :=
+    match f with
+    | ens q => ens (fun r s h => ((r = s x) //\\ q (s x)) s h)
+    | req p => f
+    | seq a b => seq a (replace_ret x b)
+    | fexists i f => fexists i (replace_ret x f)
+    end. *)
 
-Inductive result : Type :=
-| norm : Z -> result
-.
+  Inductive result : Type :=
+  | norm : Z -> result
+  .
 
-Reserved Notation " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " (at level 50, left associativity).
+  Reserved Notation " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " (at level 50, left associativity).
 
-(* axiomatization of semantics for staged formulae *)
-Inductive satisfies : bool -> store -> heap -> bool -> store -> heap -> result -> flow -> Prop :=
-  | sem_req: forall h3 p s1 s2 h1 r r1 f,
-    (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ p s1 h2) ->
-    f r1 = req p ->
-    sem[true, s1, h3]=>[true, s2, h1, norm r] |= f
-  | sem_ens: forall h1 h3 q v s f,
-    (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ q v s h2) ->
-    (* f r1 = ens ((r1 = v) //\\ q) -> *)
-    f v = ens q ->
-    sem[true, s, h1]=>[true, s, h3, norm v] |= f
-  | sem_ex: forall s s1 h1 h2 x e r,
-    (* the reason we can't use hoas is that the binding to the existential has to appear in the stack... *)
-    (exists v, sem[true, supdate x v s, h1]=>[true, s1, h2, r] |= e) ->
-    sem[true, s, h1]=>[true, s1, h2, r] |= fun r1 => fexists x (e r1)
-  | sem_seq: forall f1 f2 r1 h1 h2 h3 c s1 s2 s3 r2 st1 st2 ff,
-    sem[true, s1, h1]=>[true, s2, h2, norm r1] |= f1 ->
-    sem[true, s2, h2]=>[c, s3, h3, r2] |= f2 ->
-    st1 = f1 r1 ->
-    st2 = f2 r1 ->
-    ff r1 = (st1;;st2) ->
-    sem[true, s1, h1]=>[c, s3, h3, r2] |= ff
+  (* axiomatization of semantics for staged formulae *)
+  Inductive satisfies : bool -> store -> heap -> bool -> store -> heap -> result -> flow -> Prop :=
+    | sem_req: forall h3 p s1 s2 h1 r r1 f,
+      (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ p s1 h2) ->
+      f r1 = req p ->
+      sem[true, s1, h3]=>[true, s2, h1, norm r] |= f
+    | sem_ens: forall h1 h3 q v s f,
+      (exists h2, h3 = hunion h1 h2 /\ hdisjoint h1 h2 /\ q v s h2) ->
+      (* f r1 = ens ((r1 = v) //\\ q) -> *)
+      f v = ens q ->
+      sem[true, s, h1]=>[true, s, h3, norm v] |= f
+    | sem_ex: forall s s1 h1 h2 x e r,
+      (* the reason we can't use hoas is that the binding to the existential has to appear in the stack... *)
+      (exists v, sem[true, supdate x v s, h1]=>[true, s1, h2, r] |= e) ->
+      sem[true, s, h1]=>[true, s1, h2, r] |= fun r1 => fexists x (e r1)
+    | sem_seq: forall f1 f2 r1 h1 h2 h3 c s1 s2 s3 r2 st1 st2 ff,
+      sem[true, s1, h1]=>[true, s2, h2, norm r1] |= f1 ->
+      sem[true, s2, h2]=>[c, s3, h3, r2] |= f2 ->
+      st1 = f1 r1 ->
+      st2 = f2 r1 ->
+      ff r1 = (st1;;st2) ->
+      sem[true, s1, h1]=>[c, s3, h3, r2] |= ff
 
-where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f)
-.
+  where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f)
+  .
 
-Module SemanticsExamples.
+  Module SemanticsExamples.
 
-  Definition f1 : flow := fun r => ens (fun r1 => pure (r1=1 /\ r=r1)).
-  Definition f2 : flow := fun (r:Z) => req (fun s h => s "x" = Some 1).
+    Definition f1 : flow := fun r => ens (fun r1 => pure (r1=1 /\ r=r1)).
+    Definition f2 : flow := fun (r:Z) => req (fun s h => s "x" = Some 1).
 
-  (* ex z; req x->z; ens[r] x->1/\r=1 *)
-  Definition f3 : flow := fun r =>
-    (* fexists "z" (req (pts "x" "z") ;; ens ((r=1) //\\ ptsval "x" 1)). *)
-    fexists "z" (req (pts "x" "z") ;; ens (fun r1 => (r=r1) //\\ ptsval "x" 1)).
+    (* ex z; req x->z; ens[r] x->1/\r=1 *)
+    Definition f3 : flow := fun r =>
+      (* fexists "z" (req (pts "x" "z") ;; ens ((r=1) //\\ ptsval "x" 1)). *)
+      fexists "z" (req (pts "x" "z") ;; ens (fun r1 => (r=r1) //\\ ptsval "x" 1)).
 
-  Example ex_sem_f1:
-    sem[true, sempty, hempty]=>[true, sempty, hempty, norm(1)] |= f1.
-  Proof.
-    apply sem_ens with (q := fun r => pure (r=1)).
-    exists hempty.
-    heap.
-    unfold pure.
-    intuition auto.
-    unfold f1.
-    f_equal.
-    unfold pure.
-    apply functional_extensionality.
-    intros.
-    apply functional_extensionality.
-    intros.
-    apply functional_extensionality.
-    intros.
-    auto.
-    apply propositional_extensionality.
-    intuition auto.
-  Qed.
+    Example ex_sem_f1:
+      sem[true, sempty, hempty]=>[true, sempty, hempty, norm(1)] |= f1.
+    Proof.
+      apply sem_ens with (q := fun r => pure (r=1)).
+      exists hempty.
+      heap.
+      unfold pure.
+      intuition auto.
+      unfold f1.
+      f_equal.
+      unfold pure.
+      apply functional_extensionality.
+      intros.
+      apply functional_extensionality.
+      intros.
+      apply functional_extensionality.
+      intros.
+      auto.
+      apply propositional_extensionality.
+      intuition auto.
+    Qed.
 
-  (* Example ex_sem_f3:
-    sem[true, (supdate "x" 2 sempty), (hupdate 2 3 hempty) ]=>[
-      true, (supdate "x" 2 sempty), (hupdate 2 1 hempty), norm(1)] |= f3.
-  Proof.
-  (* unfold f3. *)
-    apply sem_ex.
-    exists 1.
-  (* Unset Printing Notations. *)
-    apply sem_seq with (f1 := fun r => req (pts "x" "z"))
-      (f2 := fun r => ens (ptsval "x" 1))
-      (r1 := 1)
-      (h2 := hempty)
-      (s2 := (supdate "x" 2 sempty))
-    .
-    - apply sem_req.
-    exists (hupdate 2 3 hempty).
-    heap.
-    unfold pts.
-    unfold contains.
-    unfold supdate. simpl.
-    admit.
-    -
-    unfold pureconj.
-    apply sem_ens.
-    admit.
-    - auto.
-  Admitted. *)
-  (* Qed. *)
+    (* Example ex_sem_f3:
+      sem[true, (supdate "x" 2 sempty), (hupdate 2 3 hempty) ]=>[
+        true, (supdate "x" 2 sempty), (hupdate 2 1 hempty), norm(1)] |= f3.
+    Proof.
+    (* unfold f3. *)
+      apply sem_ex.
+      exists 1.
+    (* Unset Printing Notations. *)
+      apply sem_seq with (f1 := fun r => req (pts "x" "z"))
+        (f2 := fun r => ens (ptsval "x" 1))
+        (r1 := 1)
+        (h2 := hempty)
+        (s2 := (supdate "x" 2 sempty))
+      .
+      - apply sem_req.
+      exists (hupdate 2 3 hempty).
+      heap.
+      unfold pts.
+      unfold contains.
+      unfold supdate. simpl.
+      admit.
+      -
+      unfold pureconj.
+      apply sem_ens.
+      admit.
+      - auto.
+    Admitted. *)
+    (* Qed. *)
 
-End SemanticsExamples.
+  End SemanticsExamples.
 
 End StagesDeep.
 
@@ -191,41 +191,37 @@ End StagesDeep.
 Inductive result : Type :=
   | norm : Z -> result.
 
-Definition flow := bool -> store -> heap -> bool -> store -> heap -> result -> Prop.
+Definition flow := store -> heap -> store -> heap -> result -> Prop.
 
-Definition req : precond -> flow := fun p c1 s1 h1 c2 s2 h2 r =>
-  c1 = true /\ c2 = true /\
+Definition req : precond -> flow := fun p s1 h1 s2 h2 r =>
   s1 = s2 /\
   (* h3 is the piece taken out satisfying p *)
   exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p s1 h3.
   (* TODO only true case for now *)
 
-Definition ens : postcond -> flow := fun q c1 s1 h1 c2 s2 h2 r =>
-  c1 = true /\ c2 = true /\
+Definition ens : postcond -> flow := fun q s1 h1 s2 h2 r =>
   s1 = s2 /\
   (* forall v, r = norm v -> *)
   exists v, r = norm v /\
   (* h3 is the piece satisfying q that is addded to h1 *)
     exists h3, h2 = hunion h1 h3 /\ hdisjoint h1 h3 /\ q v s1 h3.
 
-Definition seq : flow -> flow -> flow := fun f1 f2 c1 s1 h1 c2 s2 h2 r =>
-  c1 = true /\ c2 = true /\
+Definition seq : flow -> flow -> flow := fun f1 f2 s1 h1 s2 h2 r =>
   exists s3 h3 r1,
-  f1 c1 s1 h1 true s3 h3 r1 /\
-  f2 true s3 h3 c2 s2 h2 r.
+  f1 s1 h1 s3 h3 r1 /\
+  f2 s3 h3 s2 h2 r.
 
 Infix ";;" := seq (at level 80, right associativity).
 
 (* we can't use hoas for this as the existential binding has to appear in the stack *)
-Definition fexists : ident -> flow -> flow := fun i f c1 s1 h1 c2 s2 h2 r =>
-  c1 = true /\ c2 = true /\
+Definition fexists : ident -> flow -> flow := fun i f s1 h1 s2 h2 r =>
   s1 i = None /\
   exists v,
-    f c1 (supdate i v s1) h1 c2 s2 h2 r.
+    f (supdate i v s1) h1 s2 h2 r.
 
-Definition replace_ret (x:ident) (f:flow) : flow := fun c1 s1 h1 c2 s2 h2 r =>
+Definition replace_ret (x:ident) (f:flow) : flow := fun s1 h1 s2 h2 r =>
   exists v, Some v = s1 x /\
-  f c1 s1 h1 c2 s2 h2 (norm v).
+  f s1 h1 s2 h2 (norm v).
 
 Module SemanticsExamples.
 
@@ -237,7 +233,7 @@ Module SemanticsExamples.
     fexists "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
 
   Example ex_sem_f1:
-    f1 true sempty hempty true sempty hempty (norm 1).
+    f1 sempty hempty sempty hempty (norm 1).
     (* sem[true, sempty, hempty]=>[true, sempty, hempty, norm(1)] |= f1. *)
   Proof.
     unfold f1.
@@ -252,8 +248,8 @@ Module SemanticsExamples.
   Qed.
 
   Example ex_sem_f3:
-    f3 true (supdate "x" 2 sempty) (hupdate 2 3 hempty) 
-      true (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1).
+    f3 (supdate "x" 2 sempty) (hupdate 2 3 hempty) 
+      (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1).
   Proof.
     unfold f3.
     unfold fexists.
@@ -351,13 +347,13 @@ match (r1, r2) with
 | (norm r3, enorm r4) => r3 = r4
 end.
 
-Definition wellformed (f:flow) c1 s1 h1 c2 s2 h2 r :=
-f c1 s1 h1 c2 s2 h2 r -> substore s1 s2.
+Definition wellformed (f:flow) s1 h1 s2 h2 r :=
+f s1 h1 s2 h2 r -> substore s1 s2.
 
-Lemma replace_ret_wellformed : forall x f c1 s1 h1 c2 s2 h2 v,
+Lemma replace_ret_wellformed : forall x f s1 h1 s2 h2 v,
 Some v = s1 x ->
-wellformed f c1 s1 h1 c2 s2 h2 (norm v) ->
-(wellformed (replace_ret x f)) c1 s1 h1 c2 s2 h2 (norm v).
+wellformed f s1 h1 s2 h2 (norm v) ->
+(wellformed (replace_ret x f)) s1 h1 s2 h2 (norm v).
 Proof.
 unfold wellformed.
 intros.
@@ -368,11 +364,11 @@ Qed.
 
 (* we could prove _wellformed lemmas for all req, ens, etc., but currently we're doing it only for the structures generated from the forward rules *)
 
-Lemma forward_wellformed : forall e f c1 s1 h1 c2 s2 h2 r,
-forward e f -> (wellformed f) c1 s1 h1 c2 s2 h2 r.
+Lemma forward_wellformed : forall e f s1 h1 s2 h2 r,
+forward e f -> (wellformed f) s1 h1 s2 h2 r.
 Proof.
-intros e f c1 s1 h1 c2 s2 h2 r H.
-revert c1 s1 h1 c2 s2 h2 r.
+intros e f s1 h1 s2 h2 r H.
+revert s1 h1 s2 h2 r.
 induction H; intros.
 - unfold wellformed; intros.
   unfold ens in H; destr H; subst.
@@ -382,23 +378,23 @@ induction H; intros.
   apply substore_refl.
 -
   unfold wellformed; intros.
-  unfold fexists in H2; destruct H2 as [? [? [? [v ?]]]]; subst.
-  unfold seq in H5; destruct H5 as [_ [_ [s3 [h3 [? [Hrr Hf2]]]]]]. subst.
+  unfold fexists in H2. destruct H2 as [? [v H5]]. subst.
+  unfold seq in H5. destruct H5 as [s3 [h3 [? [Hrr Hf2]]]]. subst.
 
   (* introduce well-formed lemma on replace_ret *)
-  pose proof (replace_ret_wellformed x f1 true (supdate x v s1) h1 true s3 h3 v) as Hret.
+  pose proof (replace_ret_wellformed x f1 (supdate x v s1) h1 s3 h3 v) as Hret.
   rewrite supdate_same in Hret.
   assert (Some v = Some v) as triv. reflexivity.
   specialize (Hret triv); clear triv.
 
   (* assuming f1 is wf using the IH, replace_ret f1 is wf *)
-  specialize (IHforward1 true (supdate x v s1) h1 true s3 h3 (norm v)).
+  specialize (IHforward1 (supdate x v s1) h1 s3 h3 (norm v)).
   specialize (Hret IHforward1).
   unfold wellformed in Hret.
   specialize (Hret Hrr).
 
   unfold wellformed in IHforward2.
-  specialize (IHforward2 true s3 h3 true s2 h2 r Hf2).
+  specialize (IHforward2 s3 h3 s2 h2 r Hf2).
 
   unfold wellformed in IHforward1.
   unfold replace_ret in Hrr; destruct Hrr as [? [? Hf1]]; rewrite supdate_same in H1; inj H1.
@@ -420,7 +416,7 @@ such that:
     substore se1 ss1 ->
     (* he1 = hs1 -> *)
     forward e f ->
-    f true ss1 hs1 true ss2 hs2 rs ->
+    f ss1 hs1 ss2 hs2 rs ->
     substore se2 ss2
     (* /\ he2 = hs2 *)
     /\ compatible rs re.
@@ -435,9 +431,8 @@ such that:
     - (* var. the proof comes down to the fact that both spec and program read
           s(x) and leave the heap unchanged. *)
       inv Hf.
-      unfold ens in Hs; destr Hs.
-      subst.
-      unfold emp in H11.
+      unfold ens in Hs; destr Hs. subst.
+      unfold emp in H9.
       unfold compatible.
       heap.
       unfold substore in Hsub.
@@ -448,7 +443,7 @@ such that:
       inv Hf.
       unfold ens in Hs; destr Hs; subst.
       unfold compatible.
-      unfold pureconj in H8.
+      unfold pureconj in H6.
       intuition auto.
 
     -
@@ -460,9 +455,9 @@ such that:
     (* invp Hf [ | |Hff1 Hff2]. *)
     (* inversion Hf as [ Hy Hz |  |Hff1 Hff2 Hz]. subst; clear Hf. *)
     (* the spec is of the form ex x. f1[x/r];f2 *)
-    unfold fexists in Hs; destruct Hs as [_ [_ [Hnotin [v1 Hseq]]]].
+    unfold fexists in Hs. destruct Hs as [Hnotin [v1 Hseq]].
     (* see how it evaluates *)
-    unfold seq in Hseq; destruct Hseq as [_ [_ [s3 [h3 [? [Hrr ?]]]]]].
+    unfold seq in Hseq. destruct Hseq as [s3 [h3 [? [Hrr ?]]]].
     unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]].
 
 
@@ -491,7 +486,7 @@ such that:
     rewrite supdate_same.
     (* need to know substore (supdate x v1 ss1) H6 is preserved by all spec/f eval *)
     (* but how to know that, as we can give any f *)
-    pose proof (forward_wellformed _ _ true (supdate x v1 ss1) hs1 true s3 h3 (norm H10) H2) as Hf1wf.
+    pose proof (forward_wellformed _ _ (supdate x v1 ss1) hs1 s3 h3 (norm H10) H2) as Hf1wf.
     unfold wellformed in Hf1wf.
 
     (* assert (Hpreserve : substore (supdate x v1 ss1) s3). admit. *)
