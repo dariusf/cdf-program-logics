@@ -223,6 +223,24 @@ Definition replace_ret (x:ident) (f:flow) : flow := fun s1 h1 s2 h2 r =>
   exists v, Some v = s1 x /\
   f s1 h1 s2 h2 (norm v).
 
+(* For reasoning forward from flows in the context *)
+Ltac fstep :=
+  match goal with
+  | H : seq _ _ _ _ _ _ _ |- _ => unfold seq in H; destr H
+  | H : req _ _ _ _ _ _ |- _ => unfold req in H; destr H; subst
+  | H : ens _ _ _ _ _ _ |- _ => unfold ens in H; destr H; subst
+  | H : pureconj _ _ _ _ |- _ => unfold pureconj in H; destr H; subst
+  end.
+
+Ltac fsteps :=
+  match goal with
+  | H : seq _ _ _ _ _ _ _ |- _ => fstep; fsteps
+  | H : req _ _ _ _ _ _ |- _ => fstep; fsteps
+  | H : ens _ _ _ _ _ _ |- _ => fstep; fsteps
+  | H : pureconj _ _ _ _ |- _ => fstep; fsteps
+  | _ => idtac
+  end.
+
 Module SemanticsExamples.
 
   Definition f1 : flow := ens (fun r => pure (r=1)).
@@ -542,12 +560,20 @@ End SemanticsExamples.
 
 (** * Semantic flows *)
 
-  Definition triple (pre:flow) (e:expr) (spec:flow) :=
+  Definition triple (pre:flow) (e:expr) (spec:flow) : Prop :=
     forall s1 h1 s2 h2 r sr s0 h0 r0 s3 h3,
         pre s0 h0 s1 h1 r0 ->
         bigstep s1 h1 e s2 h2 r ->
         spec s0 h0 s3 h3 sr ->
         compatible sr r /\ h2 = h3.
+
+  Definition triple_tabula_rasa (e:expr) (spec:flow) : Prop :=
+    triple (ens (fun r => pure True)) e spec.
+    (* forall s1 h1 s2 h2 r sr s0 h0 r0 s3 h3,
+        pre s0 h0 s1 h1 r0 ->
+        bigstep s1 h1 e s2 h2 r ->
+        spec s0 h0 s3 h3 sr ->
+        compatible sr r /\ h2 = h3. *)
     
     (*
       {pre} e {spec}
@@ -564,27 +590,17 @@ End SemanticsExamples.
     intros.
     unfolds.
     intros.
-    inv H0.
+    match goal with | H : bigstep _ _ _ _ _ _ |- _ => inv H end.
     split.
-    - unfold seq.
-    unfolds in H1.
-    destr H1.
-    unfolds in H5.
-    destr H5.
-    unfolds in H11.
-    unfolds.
-    destruct sr.
-    subst.
-    inj H6.
-    easy.
-    - unfolds in H1.
-    destr H1.
-    unfolds in H5.
+    - fstep.
+      fstep.
+      fstep.
+      unfolds.
+      auto.
+    - fstep.
+    fstep.
+    fstep.
     (* TODO need determinism to conclude that the heap is the same *)
-    destr H5.
-    unfolds in H11.
-    destr H11.
-    subst.
     admit.
     (* TODO substore then needs simulation relation *)
 Abort.

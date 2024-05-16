@@ -81,6 +81,13 @@ Ltac destr H :=
   | _ => idtac
   end.
 
+Ltac destr_all :=
+  match goal with
+  | H : _ /\ _ |- _ => destr H; destr_all
+  | H : ex _ |- _ => destr H; destr_all
+  | _ => idtac
+  end.
+
 (* https://github.com/mattam82/Coq-Equations/blob/main/theories/Init.v#L148 *)
 Ltac forward_gen H tac :=
   match type of H with
