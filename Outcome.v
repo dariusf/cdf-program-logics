@@ -86,7 +86,7 @@ Section RC.
     min_st_lb b a = c -> (forall x, x + b >= a -> c <= x)%nati.
   Proof.
     intros.
-    unfolds in H.
+    unfold min_st_lb in H.
     destruct b as [nb|]; destruct a as [na|].
     - destruct x as [nx|]. destruct c as [nc|].
       + simpl in *.
@@ -117,7 +117,7 @@ Section RC.
     max_st_ub b a = Some c -> (forall x, x + b <= a -> c >= x)%nati.
   Proof.
     intros.
-    unfolds in H.
+    unfold max_st_ub in H.
     destruct b as [nb|]; destruct a as [na|].
     - simpl in *.
       inj H0.
@@ -150,8 +150,8 @@ Section RC.
   Proof.
     intros.
     destruct a. destruct b. destruct c.
-    unfolds in H.
-    unfolds.
+    unfold resources_split_constr in H.
+    unfold resources_split.
     intros.
     forward H by auto.
     forward H by auto.
@@ -278,7 +278,7 @@ Section RC.
     Example e9_split : resources_split_constr
       (rb inf inf) (rb inf inf) (rb 0 inf).
     Proof.
-      unfolds. intros. intuition.
+      unfold resources_split_constr. intros. intuition.
     Qed.
 
     Example e10_split : resources_split
@@ -295,11 +295,11 @@ Section RC.
     Proof.
       intros.
       intuition.
-      unfolds in H.
+      unfold resources_split_constr in H.
       forward H by apply inf_greatest.
       forward H by rewrite nati_le_inf_r; rewrite nati_le_inf; easy.
       destruct H.
-      unfolds in H.
+      unfold max_st_ub in H.
     Abort.
 
   End Examples.
@@ -465,7 +465,7 @@ Section RC.
       exists (rb 0 inf).
       simpl.
       intuition.
-      unfolds in H; destruct r; unfolds in H; destruct H; subst.
+      unfold term in H; destruct r; unfold rc in H; destruct H; subst.
       simpl.
       intros.
       easy.
@@ -483,7 +483,7 @@ Section RC.
       exists (rb inf inf).
       simpl.
       intuition.
-      unfolds in H; destruct r; unfolds in H; destruct H; subst.
+      unfold term in H; destruct r; unfold rc in H; destruct H; subst.
       simpl.
       intros.
       easy.
@@ -803,7 +803,7 @@ Section Bigstep.
         specialize (He2 s2a s2b s2c res s s1 r).
         unfold aand in He2.
         forward He2 by auto.
-        forward He2 by unfolds; auto.
+        forward He2 by unfold rc_a_interp; auto.
         forward He2 by auto.
         destruct He2 as [Hok [_ _]].
         specialize (Hok H8).
@@ -813,7 +813,7 @@ Section Bigstep.
         specialize (He1 s1a s1b s1c 0 s s1 r).
         unfold aand in He1.
         forward He1 by auto.
-        forward He1 by unfolds; auto.
+        forward He1 by unfold rc_a_interp; auto.
         forward He1 by auto.
         destruct He1 as [_ [Her _]].
         specialize (Her H8).
@@ -822,7 +822,7 @@ Section Bigstep.
         specialize (He2 s2a s2b s2c 0 s s1 r).
         unfold aand in He2.
         forward He2 by auto.
-        forward He2 by unfolds; auto.
+        forward He2 by unfold rc_a_interp; auto.
         forward He2 by auto.
         destruct He2 as [_ [Her _]].
         specialize (Her H8).
@@ -832,7 +832,7 @@ Section Bigstep.
         specialize (He1 s1a s1b s1c 0 s s1 r).
         unfold aand in He1.
         forward He1 by auto.
-        forward He1 by unfolds; auto.
+        forward He1 by unfold rc_a_interp; auto.
         forward He1 by auto.
         destruct He1 as [_ [_ Hnt]].
         specialize (Hnt H5).
@@ -841,7 +841,7 @@ Section Bigstep.
         specialize (He2 s2a s2b s2c 0 s s1 r).
         unfold aand in He2.
         forward He2 by auto.
-        forward He2 by unfolds; auto.
+        forward He2 by unfold rc_a_interp; auto.
         forward He2 by auto.
         destruct He2 as [_ [_ Hnt]].
         specialize (Hnt H5).

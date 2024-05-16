@@ -116,11 +116,13 @@ Ltac unfolds_base :=
   match goal with |- ?G =>
    apply_to_head_of G ltac:(fun P => unfold P) end.
 
-Tactic Notation "unfolds" :=
-  unfolds_base.
+(* Tactic Notation "unfolds" :=
+  unfolds_base. *)
+
+(* TODO unfolds does not terminate when given an implication? *)
 
 Ltac unfolds_in_base H :=
   match type of H with ?G =>
    apply_to_head_of G ltac:(fun P => unfold P in H) end.
-Tactic Notation "unfolds" "in" hyp(H) :=
-  unfolds_in_base H.
+(* Tactic Notation "unfolds" "in" hyp(H) :=
+  unfolds_in_base H. *)

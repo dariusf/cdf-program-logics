@@ -242,18 +242,24 @@ Definition wellformed (f:flow) s1 h1 s2 h2 r :=
   (* f s1 h1 s2 h2 r -> substore s1 s2. *)
 
 (** Replacing the return value preserves wellformedness *)
-Lemma replace_ret_wellformed : forall f x s1 h1 s2 h2 v v1,
+(* Lemma replace_ret_wellformed : forall f x s1 h1 s2 h2 v v1,
   Some v = s1 x ->
   wellformed f s1 h1 s2 h2 (norm v) ->
   wellformed (replace_ret x f) s1 h1 s2 h2 (norm v1).
 Proof.
   intros f.
-  induction f; intros x s1 h1 s2 h2 v H Hs.
+  induction f; intros x s1 h1 s2 h2 v v1 H.
   (* unfold wellformed. *)
   (* intros Hs. *)
   (* unfold satisfies in H1. *)
   (* inv H1. *)
   (* induction f; inv Hs; destr_all. *)
+  - unfold wellformed.
+  intros Hs H1.
+  apply Hs.
+  simpl in H1.
+  auto. *)
+
 
 (* - unfolds. intros. unfolds in Hs. apply Hs. simpl in H0. auto. *)
 
@@ -293,5 +299,5 @@ Proof.
   auto.
   admit.
   - admit. *)
-  Abort.
+  (* Abort. *)
 (* Qed. *)
