@@ -223,6 +223,8 @@ Definition replace_ret (x:ident) (f:flow) : flow := fun s1 h1 s2 h2 r =>
   exists v, Some v = s1 x /\
   f s1 h1 s2 h2 (norm v).
 
+Definition empty := ens (fun r => pure True).
+
 (* For reasoning forward from flows in the context *)
 Ltac fstep :=
   match goal with
@@ -240,6 +242,21 @@ Ltac fsteps :=
   | H : pureconj _ _ _ _ |- _ => fstep; fsteps
   | _ => idtac
   end.
+
+Lemma empty_noop : forall s h r,
+  empty s h s h (norm r).
+Proof.
+  intros.
+  unfolds.
+  unfolds.
+  intuition.
+  exists r.
+  intuition.
+  exists hempty.
+  intuition heap.
+  unfolds.
+  intuition.
+Qed.
 
 Module SemanticsExamples.
 
@@ -559,7 +576,6 @@ End SemanticsExamples.
     End SpecExamples. *)
 
 (** * Semantic flows *)
-
   Definition triple (pre:flow) (e:expr) (spec:flow) : Prop :=
     forall s1 h1 s2 h2 r sr s0 h0 r0 s3 h3,
         pre s0 h0 s1 h1 r0 ->
@@ -568,12 +584,7 @@ End SemanticsExamples.
         compatible sr r /\ h2 = h3.
 
   Definition triple_tabula_rasa (e:expr) (spec:flow) : Prop :=
-    triple (ens (fun r => pure True)) e spec.
-    (* forall s1 h1 s2 h2 r sr s0 h0 r0 s3 h3,
-        pre s0 h0 s1 h1 r0 ->
-        bigstep s1 h1 e s2 h2 r ->
-        spec s0 h0 s3 h3 sr ->
-        compatible sr r /\ h2 = h3. *)
+    triple empty e spec.
     
     (*
       {pre} e {spec}
@@ -596,7 +607,7 @@ End SemanticsExamples.
       fstep.
       fstep.
       unfolds.
-      auto.
+      ok.
     - fstep.
     fstep.
     fstep.
