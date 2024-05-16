@@ -595,6 +595,16 @@ End SemanticsExamples.
     *)
   (* . *)
 
+  Lemma flow_det : forall s h s1 h1 r1 s2 h2 r2 (f:flow),
+      f s h s1 h1 r1 ->
+      f s h s2 h2 r2 ->
+      s1 = s2 /\ h1 = h2 /\ r1 = r2.
+  Proof.
+    intros.
+    (* destruct H. *)
+    admit.
+  Admitted.
+
   Lemma fw_const1 : forall p n,
     triple p (pconst n) (p ;; ens (fun res => (res = n) //\\ emp)).
   Proof.
@@ -611,8 +621,11 @@ End SemanticsExamples.
     - fstep.
     fstep.
     fstep.
-    (* TODO need determinism to conclude that the heap is the same *)
-    admit.
+    specialize (flow_det s0 h0 s2 h2 r0 s3 H1 H2 p H H3).
+    destr flow_det.
+    unfolds in H4.
+    subst.
+    heap.
     (* TODO substore then needs simulation relation *)
 Abort.
   (* Qed. *)
