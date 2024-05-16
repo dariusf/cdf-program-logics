@@ -229,8 +229,9 @@ End SemanticsExamples.
 
 (* forward rules say how to produce a staged formula from a program *)
 Inductive forward : expr -> flow -> Prop :=
-  | fw_const: forall n,
-    forward (pconst n) (ens (fun res => (res = n) //\\ emp))
+  | fw_const: forall n p,
+    p = (ens (fun res => (res = n) //\\ emp)) ->
+    forward (pconst n) p
 
   | fw_var: forall x v,
     forward (pvar x) (ens (fun res s h => s x = Some v /\ res = v /\ emp s h))
@@ -247,6 +248,7 @@ Inductive forward : expr -> flow -> Prop :=
     forward e1 f1 ->
     forward e2 f2 ->
     replace_ret x f1 = f3 ->
+    (* f1 ;; ens (fun _ => ) = f3 -> *)
     forward (plet x e1 e2) (fexists x (f3 ;; f2))
 
   (* | fw_get: forall l v, 
@@ -321,6 +323,30 @@ Proof.
   (* Abort. *)
 (* Qed. *)
 
+  Lemma forward_replace_ret : forall e f x,
+    forward e f ->
+    forward e (replace_ret x f).
+  Proof.
+    intros.
+    inv H.
+    -
+    simpl.
+      apply fw_const.
+      f_equal.
+      apply functional_extensionality. intros r.
+      apply functional_extensionality. intros s.
+      apply functional_extensionality. intros h.
+      apply propositional_extensionality.
+      split; intros.
+      +
+        destr H.
+
+      admit.
+      + admit.
+    - admit.
+    - admit.
+  Admitted.
+
   Theorem soundness :
     forall se1 he1 e se2 he2 re (**) f ss1 hs1 ss2 hs2 rs,
       bigstep se1 he1 e se2 he2 re ->
@@ -386,8 +412,37 @@ Proof.
     (* easy. *)
     (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
     pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha.
-    (* specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 r1 Hha H2 H13). *)
-    (* specialize (IHHb1 (replace_ret x f1) (supdate x v1 ss1) hs1 s4 h4 r1 Hha H2 H13). *)
+
+    (* TODO the problem is the ih concerns the same fs, but let does not uniformly transform substructures, there is the replace ret in between.
+      and replace ret is defined inductively on the structure of f so i can't simplify it, and don't have any properties to reason about it *)
+
+    (* assert (forall s1 h1 s2 h2 v f,
+      satisfies s1 h1 s2 h2 (norm v) (replace_ret x f) ->
+      exists v1, satisfies (supdate x v s1) h1 s2 h2 (norm v1) f
+      ) as Hrrs. admit. *)
+      (* need a lemma of this form. but this doesn't capture what it does properly *)
+
+    assert (forall e f x,
+      forward e f ->
+      forward e (replace_ret x f)
+      ) as Hrrf. admit.
+
+    (* assert (forall s1 h1 s2 h2 v f,
+      satisfies s1 h1 s2 h2 (norm v) (replace_ret x f) ->
+      exists v1, satisfies (supdate x v s1) h1 s2 h2 (norm v1) f
+      ) as Hrrs. admit.
+      destruct r1.
+    specialize (Hrrs _ _ _ _ _ _ Hs1).
+    destruct Hrrs as [z1 Hrrs].
+    rewrite supdate_same in Hrrs. *)
+
+    (* specialize (IHHb1 f1 (supdate x z (supdate x v1 ss1)) hs1 s4 h4 (norm z) Hha H2 Hrrs). *)
+
+    (* cannot apply because semantics is mismatched *)
+    (* specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm z) Hha H2 Hs1). *)
+    (* cannot apply because forward rules is mismatched *)
+    specialize (Hrrf _ _ x H2).
+    specialize (IHHb1 (replace_ret x f1) (supdate x v1 ss1) hs1 s4 h4 r1 Hha Hrrf Hs1).
 (*
 
     destruct IHHb1 as [IH1 IH2].
