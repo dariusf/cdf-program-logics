@@ -84,11 +84,13 @@ Inductive flow : Type :=
 
 (* Definition flow := Z -> stages. *)
 
+Definition empty := ens (fun r => pure True).
+
 Infix ";;" := seq (at level 80, right associativity).
 
 Fixpoint replace_ret x f :=
   match f with
-  | ens q => ens (fun r s h => exists old v, s x = Some v /\ ((r = v) //\\ q old) s h)
+  | ens q => ens (fun _ s h => exists v, s x = Some v /\ q v s h)
   | req _ => f
   | seq a b => seq a (replace_ret x b)
   | fexists i f => fexists i (replace_ret x f)
@@ -103,33 +105,47 @@ Fixpoint replace_ret x f :=
 (* axiomatization of semantics for staged formulae *)
 Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :=
 
-  | sem_req: forall p s1 h1 s2 h2 r,
-    s1 = s2 ->
+  | sat_req p s1 h1 s2 h2 r h3
+    (Hsu: s1 = s2)
     (* h3 is the piece taken out satisfying p *)
-    (exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p s1 h3) ->
+    (Hex: h1 = hunion h2 h3)
+    (Hd: hdisjoint h2 h3)
+    (Hp: p s1 h3) :
     satisfies s1 h1 s2 h2 (norm r) (req p)
 
-  | sem_ens: forall q s1 h1 s2 h2 r h3 v,
-    s1 = s2 ->
+  | sat_ens q s1 h1 s2 h2 r h3 v
+    (Hsu:s1 = s2)
     (* forall v, r = norm v -> *)
-    r = norm v /\
+    (Hr: r = norm v)
     (* h3 is the piece satisfying q that is addded to h1 *)
-    h2 = hunion h1 h3 /\ hdisjoint h1 h3 /\ q v s1 h3 ->
-    satisfies s1 h1 s2 h3 (norm v) (ens q)
+    (Hh: h2 = hunion h1 h3)
+    (Hd: hdisjoint h1 h3)
+    (Hq: q v s1 h3) :
+    satisfies s1 h1 s2 h2 (norm v) (ens q)
 
-  | sem_seq: forall f1 f2 s1 h1 s2 h2 r s3 h3 r1,
-    satisfies s1 h1 s3 h3 r1 f1 ->
-    satisfies s3 h3 s2 h2 r f2 ->
+  | sat_seq f1 f2 s1 h1 s2 h2 r s3 h3 r1
+    (Hs1: satisfies s1 h1 s3 h3 r1 f1)
+    (Hs2: satisfies s3 h3 s2 h2 r f2) :
     satisfies s1 h1 s2 h2 r (seq f1 f2)
 
-  (* | sem_ex: forall s s1 h1 h2 x e r,
+  (* | sat_ex: forall s s1 h1 h2 x e r,
     (* the reason we can't use hoas is that the binding to the existential has to appear in the stack... *)
     (exists v, , supdate x v s, h1]=>[true, s1, h2, r] |= e) ->
     sem[true, s, h1]=>[true, s1, h2, r] |= fun r1 => fexists x (e r1) *)
 
-  | sem_ex: forall x f s1 h1 s2 h2 r,
+  (* | sat_ex: forall x f s1 h1 s2 h2 r,
     s1 x = None ->
+    (exists v, satisfies (supdate x v s1) h1 s2 h2 r f) ->
+    satisfies s1 h1 s2 h2 r (fexists x f) *)
+
+  | sat_ex
+  (* (x:ident) (f:flow) (s1 s2:store) (h1 h2:heap) r *)
+    x f s1 h1 s2 h2 r
+    (Hnotin: s1 x = None)
+    (Hex: exists v, satisfies (supdate x v s1) h1 s2 h2 r f) :
     satisfies s1 h1 s2 h2 r (fexists x f)
+  
+
     (* f (supdate i v s1) h1 s2 h2 r *)
   
     (* sem[true, s1, h1]=>[true, s2, h2, norm r1] |= f1 ->
@@ -143,69 +159,72 @@ Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :
     (* where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f) *)
   .
 
+(** Result can be anything if unconstrained *)
+Lemma unconstrained_res : forall s h v,
+  satisfies s h s h (norm v) empty.
+Proof.
+  intros.
+  apply sat_ens with (h3:=hempty) (r:=norm v); heap.
+  unfold pure.
+  auto.
+Qed.
 
-(* Module SemanticsExamples.
+(** replace_ret removes the result value and constrains the given variable *)
+Example e_replace_ret : forall x s h,
+  satisfies s h s h (norm 2) (replace_ret x (ens (fun r => pure (r = 1)))) <->
+    satisfies s h s h (norm 2) (ens (fun r s h => s x = Some 1)).
+Proof.
+  split.
+  - intros.
+    simpl in H.
+    inv H.
+    destr_all.
+    unfold pure in H2.
+    destr H2.
+    subst.
+    apply sat_ens with (h3:=hempty) (r:=norm 2); auto.
+  - intros.
+    simpl.
+    inv H.
+    apply sat_ens with (h3:=hempty) (r:=norm 2); heap.
+    exists 1.
+    intuition easy.
+Qed.
 
-  Definition f1 : flow := fun r => ens (fun r1 => pure (r1=1 /\ r=r1)).
-  Definition f2 : flow := fun (r:Z) => req (fun s h => s "x" = Some 1).
+Module SemanticsExamples.
 
   (* ex z; req x->z; ens[r] x->1/\r=1 *)
-  Definition f3 : flow := fun r =>
-    (* fexists "z" (req (pts "x" "z") ;; ens ((r=1) //\\ ptsval "x" 1)). *)
-    fexists "z" (req (pts "x" "z") ;; ens (fun r1 => (r=r1) //\\ ptsval "x" 1)).
+  Definition f3 : flow :=
+    fexists "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
 
-  Example ex_sem_f1:
-    sem[true, sempty, hempty]=>[true, sempty, hempty, norm(1)] |= f1.
+  Example ex_sem_f3:
+    satisfies (supdate "x" 2 sempty) (hupdate 2 3 hempty)
+      (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1) f3.
   Proof.
-    apply sem_ens with (q := fun r => pure (r=1)).
-    exists hempty.
+    unfold f3.
+    apply sat_ex.
     heap.
-    unfold pure.
-    intuition auto.
-    unfold f1.
-    f_equal.
-    unfold pure.
-    apply functional_extensionality.
-    intros.
-    apply functional_extensionality.
-    intros.
-    apply functional_extensionality.
-    intros.
-    auto.
-    apply propositional_extensionality.
-    intuition auto.
-  Qed. *)
+    exists 3.
+    apply sat_seq with (s3:=supdate "z" 3 (supdate "x" 2 sempty)) (h3:=hempty) (r1:=norm 5).
+    - apply sat_req with (h3:=hupdate 2 3 hempty).
+      reflexivity.
+      heap.
+      heap.
+      unfold pts.
+      exists 2.
+      exists 3.
+      intuition easy.
+    - apply sat_ens with (h3:=hupdate 2 1 hempty) (r:=norm 1); heap.
+      unfold pureconj.
+      unfold ptsval.
+      intuition.
+      exists 2.
+      intuition.
+      unfold contains.
+      heap.
+  Qed.
 
-  (* Example ex_sem_f3:
-    sem[true, (supdate "x" 2 sempty), (hupdate 2 3 hempty) ]=>[
-      true, (supdate "x" 2 sempty), (hupdate 2 1 hempty), norm(1)] |= f3.
-  Proof.
-  (* unfold f3. *)
-    apply sem_ex.
-    exists 1.
-  (* Unset Printing Notations. *)
-    apply sem_seq with (f1 := fun r => req (pts "x" "z"))
-      (f2 := fun r => ens (ptsval "x" 1))
-      (r1 := 1)
-      (h2 := hempty)
-      (s2 := (supdate "x" 2 sempty))
-    .
-    - apply sem_req.
-    exists (hupdate 2 3 hempty).
-    heap.
-    unfold pts.
-    unfold contains.
-    unfold supdate. simpl.
-    admit.
-    -
-    unfold pureconj.
-    apply sem_ens.
-    admit.
-    - auto.
-  Admitted. *)
-  (* Qed. *)
-
-(* End SemanticsExamples. *)
+End SemanticsExamples.
 
 
 (* forward rules say how to produce a staged formula from a program *)
@@ -273,8 +292,8 @@ Proof.
     unfolds in H7.
     (* destr_all. *)
     subst.
-    Print sem_ens.
-    apply sem_ens with (r:=norm H4) (h2:=hunion h1 h2).
+    Print sat_ens.
+    apply sat_ens with (r:=norm H4) (h2:=hunion h1 h2).
     auto.
     eapply H0. *)
 
@@ -292,7 +311,7 @@ Proof.
   
   unfolds in H0.
   apply H0.
-  eapply sem_seq with (s3:=s4) (h3:=h4).
+  eapply sat_seq with (s3:=s4) (h3:=h4).
   exact H8.
 
   auto.
@@ -301,3 +320,97 @@ Proof.
   - admit. *)
   (* Abort. *)
 (* Qed. *)
+
+  Theorem soundness :
+    forall se1 he1 e se2 he2 re (**) f ss1 hs1 ss2 hs2 rs,
+      bigstep se1 he1 e se2 he2 re ->
+      substore se1 ss1 ->
+      (* he1 = hs1 -> *)
+      forward e f ->
+      satisfies ss1 hs1 ss2 hs2 rs f ->
+      substore se2 ss2
+      (* /\ he2 = hs2 *)
+      /\ compatible rs re.
+  Proof.
+    intros se1 he1 e se2 he2 re
+            f ss1 hs1 ss2 hs2 rs
+            Hb.
+    revert f ss1 hs1 ss2 hs2 rs.
+    induction Hb;
+    intros f ss1 hs1 ss2 hs2 rs;
+    intros Hsub Hf Hs.
+    - (* var. the proof comes down to the fact that both spec and program read
+          s(x) and leave the heap unchanged. *)
+      inv Hf.
+      inv Hs.
+      destr_all; subst.
+      intuition.
+      unfold compatible.
+      unfold emp in H3.
+      subst.
+      unfold substore in Hsub.
+      symmetry in H.
+      specialize (Hsub v x H).
+      congruence.
+    - inv Hf.
+      inv Hs.
+      destr_all; subst.
+      unfold pureconj in Hq.
+      destr_all; subst.
+      unfold compatible.
+      intuition auto.
+    -
+    (* we have an IH for each subexpr *)
+    (* v is the intermediate result of evaluating e1 *)
+    (* r is the final result *)
+    inv Hf.
+    (* the spec is of the form ex x. f1[x/r];f2 *)
+    (* see how it evaluates *)
+    inv Hs.
+    destruct Hex as [v1 Hseq].
+    inv Hseq.
+    (* v1 is the intermediate result of the let, which should = v? *)
+
+    (* unfold replace_ret in Hs1. *)
+    (* unfold fexists in Hs.  *)
+    (* unfold seq in Hseq. destruct Hseq as [s3 [h3 [? [Hrr ?]]]]. *)
+    (* unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]]. *)
+
+    (* OLD NOW FIXED now the problem is the IH requires the eval of e1 to take place in the initial stack. but due to the existential adding something to the stack, the evaluation takes place in an extended stack, so we can't apply the IH for e1 *)
+
+    (* OLD NOW FIXED the problem is the positioning of the existential has changed. in the program, it's in the e2 initial stack. in the spec, it's right at the front, in the e1 initial stack, for f1 to assign its ret value to. so somehow need to generalise it, using compiler simulation techniques? there should be an initial relation too, so the spec is allowed to execute in an extended stack. so there's a sim rel between configurations *)
+
+    (* try to meet in the middle *)
+    (* apply IHHb2. *)
+    (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
+    (* easy. *)
+    (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
+    pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha.
+    (* specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 r1 Hha H2 H13). *)
+    (* specialize (IHHb1 (replace_ret x f1) (supdate x v1 ss1) hs1 s4 h4 r1 Hha H2 H13). *)
+(*
+
+    destruct IHHb1 as [IH1 IH2].
+    (* we know that evaluation of e1 preserves substore *)
+
+    (* now try to use IH2 *)
+    specialize (IHHb2 f2 s3 h3 ss2 hs2 rs).
+    apply IHHb2; auto.
+    apply (substore_extension_left _ s1 s3 v x IH1).
+    unfold compatible in IH2.
+    rewrite <- IH2.
+    rewrite H9.
+    rewrite supdate_same in H9.
+    rewrite supdate_same.
+    (* need to know substore (supdate x v1 ss1) H6 is preserved by all spec/f eval *)
+    (* but how to know that, as we can give any f *)
+    pose proof (forward_wellformed _ _ (supdate x v1 ss1) hs1 s3 h3 (norm H10) H2) as Hf1wf.
+    unfold wellformed in Hf1wf.
+
+    apply Hf1wf.
+    ok.
+    rewrite supdate_same.
+    reflexivity.
+*)
+
+  Admitted.
