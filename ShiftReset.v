@@ -49,7 +49,7 @@ Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     Some (elamb y e) = s f ->
     Some v = s x ->
     eval[ supdate f (elamb y e) (supdate y v s1), h, e ] => [ s1, h1, r ] ->
-    eval[ s, h, eapp f x ] => [ s1, h1, r ]
+    eval[ s, h, eapp f x ] => [ s, h1, r ]
 
   | eval_let : forall x e1 e2 v s h h2 s2 s1 h1 r,
     eval[ s, h, e1 ] => [ s1, h1, resnorm v ] ->
