@@ -113,10 +113,10 @@ Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :
     (Hp: p s1 h3) :
     satisfies s1 h1 s2 h2 (norm r) (req p)
 
-  | sat_ens q s1 h1 s2 h2 r h3 v
+  | sat_ens q s1 h1 s2 h2 h3 v
     (Hsu:s1 = s2)
     (* forall v, r = norm v -> *)
-    (Hr: r = norm v)
+    (* (Hr: r = norm v) *)
     (* h3 is the piece satisfying q that is addded to h1 *)
     (Hh: h2 = hunion h1 h3)
     (Hd: hdisjoint h1 h3)
@@ -164,7 +164,7 @@ Lemma unconstrained_res : forall s h v,
   satisfies s h s h (norm v) empty.
 Proof.
   intros.
-  apply sat_ens with (h3:=hempty) (r:=norm v); heap.
+  apply sat_ens with (h3:=hempty); heap.
   unfold pure.
   auto.
 Qed.
@@ -182,11 +182,11 @@ Proof.
     unfold pure in H2.
     destr H2.
     subst.
-    apply sat_ens with (h3:=hempty) (r:=norm 2); auto.
+    apply sat_ens with (h3:=hempty); auto.
   - intros.
     simpl.
     inv H.
-    apply sat_ens with (h3:=hempty) (r:=norm 2); heap.
+    apply sat_ens with (h3:=hempty); heap.
     exists 1.
     intuition easy.
 Qed.
@@ -214,7 +214,7 @@ Module SemanticsExamples.
       exists 2.
       exists 3.
       intuition easy.
-    - apply sat_ens with (h3:=hupdate 2 1 hempty) (r:=norm 1); heap.
+    - apply sat_ens with (h3:=hupdate 2 1 hempty); heap.
       unfold pureconj.
       unfold ptsval.
       intuition.
@@ -423,11 +423,75 @@ Proof.
     - admit.
   Admitted. *)
 
+  Lemma aa1 :
+    forall f s1 h1 s2 h2 x v ,
+      satisfies s1 h1 s2 h2 (norm v) (replace_ret x f).
+  Proof.
+    intros.
+    induction f; simpl.
+    - eapply sat_req.
+      admit.
+      admit.
+      admit.
+      admit.
+    - admit.
+    - admit.
+    - admit.
+  Abort.
+
   Lemma aa :
     forall f s1 h1 s2 h2 x v v1,
       satisfies (supdate x v s1) h1 s2 h2 (norm v1) (replace_ret x f) ->
-      satisfies (supdate x v s1) h1 s2 h2 (norm v1) f.
+      exists v2, satisfies (supdate x v s1) h1 s2 h2 (norm v2) f.
   Proof.
+    induction f.
+    -
+    intros.
+      simpl in H.
+      exists v1.
+      assumption.
+    -
+    intros.
+      simpl in H.
+      inv H.
+      destr Hq.
+      exists H.
+      apply sat_ens with (h3 := h4).
+      auto.
+      auto.
+      auto.
+      subst.
+      auto.
+    -
+      intros.
+      simpl in H.
+      inv H.
+
+      (* need wf to know s4 has x? *)
+      assert (s4 = supdate x v s4). admit.
+      rewrite H in Hs2.
+      specialize (IHf2 s4 h4 s2 h2 x v v1 Hs2).
+      destr IHf2.
+
+      exists H0.
+      apply sat_seq with (s3:=s4) (h3:=h4) (r1:=r1).
+      auto.
+      rewrite H.
+      auto.
+    -
+      intros.
+      simpl in H.
+      inv H.
+      destr Hex.
+      (* this is a problem too *)
+      assert (replace_ret x f = replace_ret i f). admit.
+      rewrite H1 in H0.
+      specialize (IHf (supdate x v s1) h1 s2 h2 i H v1 H0).
+      destr IHf.
+      exists H2.
+      (* TODO not done *)
+
+    admit.
   Abort.
     (* induction f; intros.
     -
