@@ -1,7 +1,6 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
-From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Common Sequences Separation2 Tactics.
+From CDF Require Import Common Sequences Separation2 Tactics HeapTactics.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
@@ -133,14 +132,14 @@ Lemma empty_noop : forall s h r,
   empty s h s h (norm r).
 Proof.
   intros.
-  unfolds.
-  unfolds.
+  unfold empty.
+  unfold ens.
   intuition.
   exists r.
   intuition.
   exists hempty.
   intuition heap.
-  unfolds.
+  unfold pure.
   intuition.
 Qed.
 
@@ -457,21 +456,21 @@ Lemma fw_const1 : forall p n,
   triple p (pconst n) (p ;; ens (fun res => (res = n) //\\ emp)).
 Proof.
   intros.
-  unfolds.
+  unfold triple.
   intros.
   match goal with | H : bigstep _ _ _ _ _ _ |- _ => inv H end.
   split.
   - fstep.
     fstep.
     fstep.
-    unfolds.
+    unfold compatible.
     ok.
   - fstep.
   fstep.
   fstep.
   specialize (flow_det s0 h0 s2 h2 r0 s3 H1 H2 p H H3).
   destr flow_det.
-  unfolds in H4.
+  unfold emp in H4.
   subst.
   heap.
   (* TODO substore then needs simulation relation *)
