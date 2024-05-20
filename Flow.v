@@ -1,7 +1,6 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
-From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Common Sequences Separation2 Tactics.
+From CDF Require Import Common Sequences Separation2 Tactics HeapTactics.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
@@ -96,6 +95,9 @@ Fixpoint replace_ret x f :=
   | fexists i f => fexists i (replace_ret x f)
   end.
 
+Definition compose (x:ident) (f1 f2:flow) : flow :=
+  fexists x (replace_ret x f1 ;; f2).
+
 (* Definition replace_ret (x:ident) (f:flow) : flow := fun s1 h1 s2 h2 r =>
   exists v, Some v = s1 x /\
   f s1 h1 s2 h2 (norm v). *)
@@ -128,18 +130,7 @@ Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :
     (Hs2: satisfies s3 h3 s2 h2 r f2) :
     satisfies s1 h1 s2 h2 r (seq f1 f2)
 
-  (* | sat_ex: forall s s1 h1 h2 x e r,
-    (* the reason we can't use hoas is that the binding to the existential has to appear in the stack... *)
-    (exists v, , supdate x v s, h1]=>[true, s1, h2, r] |= e) ->
-    sem[true, s, h1]=>[true, s1, h2, r] |= fun r1 => fexists x (e r1) *)
-
-  (* | sat_ex: forall x f s1 h1 s2 h2 r,
-    s1 x = None ->
-    (exists v, satisfies (supdate x v s1) h1 s2 h2 r f) ->
-    satisfies s1 h1 s2 h2 r (fexists x f) *)
-
   | sat_ex
-  (* (x:ident) (f:flow) (s1 s2:store) (h1 h2:heap) r *)
     x f s1 h1 s2 h2 r
     (Hnotin: s1 x = None)
     (Hex: exists v, satisfies (supdate x v s1) h1 s2 h2 r f) :
@@ -191,6 +182,148 @@ Proof.
     intuition easy.
 Qed.
 
+(* Lemma sat_req_inv : forall s1 h1 s2 h2 r p,
+  satisfies s1 h1 s2 h2 r (req p) ->
+  s1 = s2.
+Proof.
+  intros.
+  inv H.
+  ok.
+Qed. *)
+
+
+
+(* p cannot concern x *)
+(* Lemma pre_store_extension : forall (p:precond) s1 h s2 x v,
+  s1 x = None ->
+  p s1 h ->
+  s2 = supdate x v s1 ->
+  p s2 h.
+Proof.
+  intros. *)
+
+(* Abort. *)
+(* Admitted. *)
+(* Qed. *)
+
+(* Lemma sat_store_extension : forall f s1 h1 s2 h2 r s3 s4 x v,
+  satisfies s1 h1 s2 h2 r f ->
+  substore s1 s2 -> (* wf *)
+  substore s3 s4 -> (* wf *)
+  (* substore s1 s3 -> *)
+  (* substore s2 s4 -> *)
+  s3 = supdate x v s1 ->
+  s4 = supdate x v s2 ->
+  satisfies s3 h1 s4 h2 r f.
+Proof.
+  (* intros f s1 h1 s2 h2 r s3 s4 H.
+  revert s3 s4.
+  induction H; intros. *)
+  induction f; intros.
+  -
+    (* pose proof (sat_req_inv _ _ _ _ _ _ H). *)
+    inv H.
+    (* apply  *)
+  apply sat_req with (h3:=h4); ok.
+    subst.
+    ok.
+
+
+  - admit.
+  - admit.
+  - admit.
+Abort. *)
+
+(* Lemma sat_substore : forall f s1 h1 s2 h2 r s3 s4,
+  satisfies s1 h1 s2 h2 r f ->
+  substore s1 s2 ->
+  substore s3 s4 ->
+  substore s1 s3 ->
+  substore s2 s4 ->
+  satisfies s3 h1 s4 h2 r f.
+Proof.
+  (* intros f s1 h1 s2 h2 r s3 s4 H.
+  revert s3 s4.
+  induction H; intros. *)
+  induction f; intros.
+  -
+    (* pose proof (sat_req_inv _ _ _ _ _ _ H). *)
+    inv H.
+  apply sat_req with (h3:=h3); ok.
+    subst.
+    ok.
+
+
+  - admit.
+  - admit.
+  - admit.
+Abort. *)
+
+(* Admitted. *)
+(* Qed. *)
+
+(* Lemma compose_satisfies : forall f1 f2 s1 h1 s2 h2 s3 h3 s4 r r1 x v,
+  satisfies s1 h1 s2 h2 r f1 ->
+  satisfies s3 h2 s4 h3 r1 f2 ->
+  substore s1 s2 -> (* wf *)
+  substore s3 s4 -> (* wf *)
+
+  s3 = supdate x v s2 ->
+  (* needed *)
+  (* substore s2 s3 -> *)
+
+  s1 x = None -> (* contra *)
+  s2 x = None -> (* needed *)
+  s3 x = Some v -> (* needed *)
+  s4 x = Some v -> (* extension *)
+  satisfies s1 h1 s4 h3 r1 (compose x f1 f2).
+Proof.
+  induction f1; intros.
+  - unfold compose.
+    simpl.
+    (* inv H. *)
+    apply sat_ex.
+    ok.
+    (* the value of the existential *)
+    destruct r as [z]; exists z.
+    (* after taking p, the intermediate heap is h2 *)
+    apply sat_seq with (h3:=h2) (r1:=norm z) (s3:=s3).
+    +
+
+    (* sat in smaller store -> sat in larger store *)
+    assert (forall s1 h1 s2 h2 r f s3 s4, satisfies s1 h1 s2 h2 r f ->
+    substore s1 s3 ->
+    substore s2 s4 ->
+satisfies s3 h1 s4 h2 r f) as sat_substore.
+admit.
+
+
+apply sat_substore with (s1:=s1) (s2:=s2).
+ok.
+apply substore_extension; ok.
+ok.
+
++
+  (* need inverse? *)
+  ok.
+
+(* 
+    assert (forall s1 h1 s2 h2 r f s3, satisfies s1 h1 s2 h2 r f -> substore s1 s3 ->
+satisfies s3 h1 s2 h2 r f) as sat_substore.
+admit.
+apply sat_substore with (s1:=s3).
+ok.
+apply substore_refl.
+    admit. *)
+    (* exact H0. *)
+
+  - admit.
+  - admit.
+  - admit.
+(* Abort. *)
+Admitted.
+Qed. *)
+
 Module SemanticsExamples.
 
   (* ex z; req x->z; ens[r] x->1/\r=1 *)
@@ -215,6 +348,8 @@ Module SemanticsExamples.
       exists 3.
       intuition easy.
     - apply sat_ens with (h3:=hupdate 2 1 hempty); heap.
+      (* rewrite supdate_dupe. *)
+      (* reflexivity. *)
       unfold pureconj.
       unfold ptsval.
       intuition.
@@ -245,12 +380,13 @@ Inductive forward : expr -> flow -> Prop :=
     (* forward (pref x) (fexists (fun y => ens (fun r s h => contains y (s x) s h))) *)
     forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h)))) *)
 
-  | fw_let: forall x e1 e2 f1 f2 f3,
+  | fw_let: forall x e1 e2 f1 f2,
     forward e1 f1 ->
     forward e2 f2 ->
-    replace_ret x f1 = f3 ->
+    (* replace_ret x f1 = f3 -> *)
     (* f1 ;; ens (fun _ => ) = f3 -> *)
-    forward (plet x e1 e2) (fexists x (f3 ;; f2))
+    (* forward (plet x e1 e2) (fexists x (f3 ;; f2)) *)
+    forward (plet x e1 e2) (compose x f1 f2)
 
   (* | fw_get: forall l v, 
     forward (GET l)
@@ -258,7 +394,7 @@ Inductive forward : expr -> flow -> Prop :=
       (ens (fun r => (r = v) //\\ contains l v))) *)
 .
 
-Example e_fw_let1 : forall x,
+Example e_fw_let : forall x,
   forward (plet x (pconst 1) (pvar x)) (fexists x (
     replace_ret x (ens (fun r => pure (r=1))) ;;
     ens (fun res s h => exists v, Some v = s x /\ res = v /\ emp s h)
@@ -270,49 +406,38 @@ Proof.
   - eapply fw_const.
     reflexivity.
   - apply fw_var.
-  (* trivial from here, but we have to go through this whole song and dance *)
+    (* trivial from here, but we have to go through this whole song and dance *)
     f_equal.
-      apply functional_extensionality. intros r.
-      apply functional_extensionality. intros s.
-      apply functional_extensionality. intros h.
-      apply propositional_extensionality.
-      split; intros.
-      + destr H.
-        intuition.
-        exists H0.
-        intuition auto.
-      + destr H.
+    post_ext.
+    split; intros.
+    + destr H.
+      intuition.
       exists H0.
-        intuition auto.
-  - reflexivity.
+      intuition auto.
+    + destr H.
+      exists H0.
+      intuition auto.
 Qed.
 
-
-(* Example e_fw_let : forall x,
-(* (fexists x ( ;; ens (fun r s h => r = s x))) *)
-exists a b,
-  forward (plet x (pconst 1) (pvar x)) (fexists x (a ;; b)).
-Proof.
-  intros.
-  eexists.
-  eexists.
-  eapply fw_let.
-  eapply fw_const.
-  reflexivity.
-  eapply fw_var.
-  reflexivity.
-  reflexivity.
-  Unshelve.
-  exact 1.
-Qed.
-Print e_fw_let. *)
-
-(** The semantics only grows the store *)
-Definition wellformed (f:flow) s1 h1 s2 h2 r :=
+(** The semantics only grows the store. *)
+Definition satisfies_monotonic : forall f s1 h1 s2 h2 r,
   satisfies s1 h1 s2 h2 r f -> substore s1 s2.
-  (* f s1 h1 s2 h2 r -> substore s1 s2. *)
+Proof.
+  induction f; intros.
+  - inv H. ok.
+  - inv H. ok.
+  - inv H.
+    specialize (IHf1 _ _ _ _ _ Hs1).
+    specialize (IHf2 _ _ _ _ _ Hs2).
+    apply substore_trans with (s2 := s4); auto.
+  - inv H.
+    destruct Hex as [v Hsat].
+    specialize (IHf _ _ _ _ _ Hsat).
+    specialize (substore_reduce_left _ _ _ _ _ Hnotin IHf).
+    ok.
+Qed.
 
-(** Replacing the return value preserves wellformedness *)
+(** Replacing the return value is monotonic *)
 (* Lemma replace_ret_wellformed : forall f x s1 h1 s2 h2 v v1,
   Some v = s1 x ->
   wellformed f s1 h1 s2 h2 (norm v) ->
@@ -423,7 +548,7 @@ Proof.
     - admit.
   Admitted. *)
 
-  Lemma aa1 :
+  (* Lemma aa1 :
     forall f s1 h1 s2 h2 x v ,
       satisfies s1 h1 s2 h2 (norm v) (replace_ret x f).
   Proof.
@@ -492,7 +617,8 @@ Proof.
       (* TODO not done *)
 
     admit.
-  Abort.
+  Abort. *)
+
     (* induction f; intros.
     -
       simpl in H.
@@ -603,9 +729,36 @@ Proof.
     (* the spec is of the form ex x. f1[x/r];f2 *)
     (* see how it evaluates *)
     inv Hs.
+    (* pose proof (compose_satisfies). *)
     destruct Hex as [v1 Hseq].
+    (* v1 is the return value of f1, which can be anything due to replace ret *)
     inv Hseq.
-    (* v1 is the intermediate result of the let, which should = v? *)
+
+    assert (
+    forall x v1 ss1 hs1 s4 h4 r1 f1,
+satisfies (supdate x v1 ss1) hs1 s4 h4 r1 (replace_ret x f1) ->
+satisfies ss1 hs1 s4 h4 (norm v1) f1
+    ). admit.
+    specialize (H x v1 ss1 hs1 s4 h4 r1 f1 Hs1).
+    specialize (IHHb1 f1 ss1 hs1 s4 h4 (norm v1) Hsub H3 H).
+    destruct IHHb1 as [Hst Hcomp].
+
+    (* specialize (IHHb2 f2 (supdate x v s1) h4 ss2 hs2 rs). *)
+    specialize (IHHb2 f2 s4 h4 ss2 hs2 rs).
+    forward IHHb2 by admit.
+
+    assert (s4 x = Some v).
+    admit.
+    (* from wellformed *)
+    assert (s4 = supdate x v s4). admit.
+    rewrite H1 in Hs2.
+    assert (substore (supdate x v s4) (supdate x v1 ss2)). admit.
+    assert (substore s4 ss2). admit.
+    assert (satisfies s4 h4 ss2 hs2 rs f2) as Hs3. admit.
+
+    specialize (IHHb2 H4 Hs3).
+    intuition.
+    
 
     (* unfold replace_ret in Hs1. *)
     (* unfold fexists in Hs.  *)
@@ -621,7 +774,7 @@ Proof.
     (* with (f:=f2) (ss2:=s2) (ss1:=s2) (hs1:=hs2). *)
     (* easy. *)
     (* specialize (IHHb1 f1 (supdate x v s) hs1 s1 h1 (norm v) ). *)
-    pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha.
+    (* pose proof (substore_extension_trans _ s ss1 v1 x Hsub Hnotin) as Hha. *)
 
     (* TODO the problem is the ih concerns the same fs, but let does not uniformly transform substructures, there is the replace ret in between.
       and replace ret is defined inductively on the structure of f so i can't simplify it, and don't have any properties to reason about it *)
@@ -630,11 +783,12 @@ Proof.
 (* s[x:=v],h ~> s1,h1,norm v |= ens[res] res=1
 <->
 exists v1. s,h ~> s1,h1,norm v1 |= ens[res] x=1 *)
+(* specialize (IHHb1 (replace_ret x f1) (supdate x v1 ss1) hs1 s4 h4 r1). *)
 
-    assert (forall s1 h1 s2 h2 f x r v v1,
-      satisfies (supdate x v s1) h1 s2 h2 r (replace_ret x f) ->
-      satisfies (supdate x v s1) h1 s2 h2 (norm v1) f
-      ) as Hrrs. admit.
+    (* assert (forall s1 h1 s2 h2 f x r v1,
+      satisfies (supdate x v1 s1) h1 s2 h2 r (replace_ret x f) ->
+      satisfies s1 h1 s2 h2 (norm v1) f
+      ) as Hrrs. admit. *)
       (* need a lemma of this form. but this doesn't capture what it does properly *)
 
     (* assert (forall e f x,
@@ -648,11 +802,11 @@ exists v1. s,h ~> s1,h1,norm v1 |= ens[res] x=1 *)
       ) as Hrrs. admit.
       destruct r1.
  *)
-    specialize (Hrrs _ _ _ _ _ _ _ _ v Hs1).
+    (* specialize (Hrrs _ _ _ _ _ _ _ _ Hs1). *)
     (* destruct Hrrs as [z1 Hrrs]. *)
     (* rewrite supdate_same in Hrrs. *)
 
-    specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm v) Hha H2 Hrrs).
+    (* specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm v) Hha H2 Hrrs). *)
 
     (* cannot apply because semantics is mismatched *)
     (* specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm z) Hha H2 Hs1). *)

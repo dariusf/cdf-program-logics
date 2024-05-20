@@ -1,4 +1,6 @@
 
+From CDF Require Import Tactics.
+From Coq Require Import FunctionalExtensionality PropExtensionality.
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 Local Open Scope Z_scope.
 
@@ -39,6 +41,16 @@ Section Store.
     intros; cbn.
     unfold supdate.
     destruct (string_dec l l'); congruence.
+  Qed.
+
+  Lemma supdate_dupe : forall {A} (v:A) x s,
+    supdate x v (supdate x v s) = supdate x v s.
+  Proof.
+    intros.
+    unfold supdate.
+    apply functional_extensionality.
+    intros.
+    destruct (string_dec x x0); easy.
   Qed.
 
   (* s1 <= s2 *)
@@ -109,6 +121,65 @@ Section Store.
     (* if x is not in s1, then updating it grows s1, but the result is no larger than s2 *)
     apply H.
     assumption.
+  Qed.
+
+  Lemma substore_empty : forall (A:Type) s, @substore A sempty s.
+  Proof.
+    unfold substore.
+    unfold sempty.
+    ok.
+  Qed.
+
+  Lemma substore_same : forall A s x (v:A), s x = Some v -> supdate x v s = s.
+  Proof.
+    intros.
+    unfold supdate.
+    apply functional_extensionality.
+    intros.
+    destruct (string_dec x x0).
+    - congruence.
+    - reflexivity.
+  Qed.
+
+  (** The converse is not true. Consider: (x=1)[x:=2] <= (y=1)[x:=2] *)
+  Lemma substore_aug : forall A x (v:A) s1 s2,
+    substore s1 s2 ->
+    substore (supdate x v s1) (supdate x v s2).
+  Proof.
+    intros.
+    unfold substore.
+    intros.
+    destruct (string_dec x x0).
+    - subst.
+      unfold supdate in H0.
+      unfold supdate.
+      destruct (string_dec x0 x0).
+      inj H0.
+      ok.
+      ok.
+    - unfold substore in H.
+      rewrite supdate_other; auto.
+      pose proof (supdate_other A s1 x v x0 n).
+      rewrite H1 in H0.
+      apply H.
+      auto.
+  Qed.
+
+  (** A restricted version of the converse is true, however. *)
+  Lemma substore_reduce_left : forall A x (v:A) s1 s2,
+    (* this guarantees removing the update on the left side shrinks it *)
+    s1 x = None ->
+    substore (supdate x v s1) s2 ->
+    substore s1 s2.
+  Proof.
+    intros.
+    unfold substore. intros.
+    unfold substore in H0.
+    apply H0.
+    destruct (string_dec x x0).
+    - subst.
+      congruence.
+    - rewrite supdate_other; auto.
   Qed.
 
 End Store.

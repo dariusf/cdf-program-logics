@@ -1,6 +1,5 @@
 
 
-From CDF Require Import Separation2.
 
 (* some old tactics *)
 
@@ -21,38 +20,6 @@ Ltac inv H := inversion H; clear H; subst.
 (* Tactic Notation "inv" constr(h) := inversion h; subst. *)
 (* Ltac invp H P := inversion H as P; clear H; subst. *)
 Tactic Notation "invp" constr(h) simple_intropattern(p) := inversion h as p; subst; clear h.
-
-Ltac HUNION n :=
-  match n with
-  | O => idtac "out of fuel"
-  | S ?n' =>
-  intuition;
-    match goal with
-    | [ H: _ = hunion hempty _ |- _ ] =>
-    (* let t := type of H in idtac "empty" t n'; *)
-        rewrite hunion_empty in H;
-        HUNION n'
-    | [ H: _ = hunion _ hempty |- _ ] =>
-        rewrite hunion_comm in H;
-        HDISJ;
-        rewrite hunion_empty in H;
-        HUNION n'
-    | [ |- _ = hunion hempty _ ] =>
-        rewrite hunion_empty; HUNION n'
-    | [ |- hunion hempty _ = _ ] =>
-        rewrite hunion_empty; HUNION n'
-    | [ |- _ = hunion _ hempty ] =>
-        rewrite hunion_comm; HDISJ; rewrite hunion_empty; HUNION n'
-    | [ |- hunion _ hempty = _ ] =>
-        rewrite hunion_comm; HDISJ;
-        rewrite hunion_empty;
-        HUNION n'
-    | [ |- ?g ] => auto
-    end
-  end.
-
-(* TODO try autorewrite *)
-Ltac heap := HUNION (3%nat); HDISJ; auto.
 
 (* Ltac rw := rewrite. *)
 (* Ltac con := constructor. *)

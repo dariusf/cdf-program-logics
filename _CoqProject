@@ -12,5 +12,6 @@ Separation2.v
 Biabduction.v
 Common.v
 Tactics.v
+HeapTactics.v
 Outcome.v
 ShiftReset.v
