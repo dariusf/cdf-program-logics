@@ -1,6 +1,6 @@
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From CDF Require Import Common Sequences Separation2 Tactics HeapTactics.
-From Coq Require Import ssreflect ssrfun ssrbool.
+(* From Coq Require Import ssreflect ssrfun ssrbool. *)
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
@@ -378,25 +378,31 @@ Proof.
     (* v1 is the return value of f1, which can be anything due to replace ret *)
     inv Hseq.
 
-    (* simpl in Hfresh. *)
-    (* destruct Hfresh as [Hfresh1 Hfresh2]. *)
-    (* pose proof (fresh_replace _ _ _ Hfresh1) as Hfresh3. *)
-    move: Hfresh => /= [Hfresh _].
-    move: Hfresh (fresh_replace _ _ _ Hfresh) => _ Hfresh.
+    (* reason about replace_ret using the freshness of existentials *)
+    pose proof (satisfies_replace_ret f1 x v1 (supdate x v1 ss1) hs1 s4 h4 r1) as Hrr.
+    forward Hrr. {
+      simpl in Hfresh.
+      destruct Hfresh as [Hfresh _].
+      apply (fresh_replace _ _ _ Hfresh).
+    }
+    forward Hrr by apply supdate_same.
+    specialize (Hrr Hs1).
+    clear Hfresh.
 
-    assert ((supdate x v1 ss1) x = Some v1) as Heq. { apply supdate_same. }
-    pose proof (satisfies_replace_ret f1 x v1 (supdate x v1 ss1) hs1 s4 h4 r1 Hfresh Heq Hs1).
-
-    assert (substore s (supdate x v1 ss1)) as Hsub2.
-    { apply substore_extension_trans with (s2:=ss1); auto. }
-
-    specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm v1) Hsub2 H3 H).
-
+    (* apply IH1 to know that all of e1 is sound *)
+    specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm v1)).
+    forward IHHb1 by apply substore_extension_trans with (s2:=ss1); auto.
+    specialize (IHHb1 H3 Hrr).
     destruct IHHb1 as [Hst Hcomp].
-    pose proof (satisfies_monotonic _ _ _ _ _ _ Hs1) as Hmono.
     unfold compatible in Hcomp; subst.
-    pose proof (substore_extension_inv _ _ _ _ _ Hmono) as H0.
-    specialize (substore_extension_left _ s1 s4 v x Hst H0) as Hsub1.
-    specialize (IHHb2 f2 s4 h4 ss2 hs2 rs Hsub1 H4 Hs2).
-    intuition.
+
+    (* apply IH2 to know that the entire thing is sound *)
+    specialize (IHHb2 f2 s4 h4 ss2 hs2 rs).
+    forward IHHb2. {
+      pose proof (satisfies_monotonic _ _ _ _ _ _ Hs1) as Hmono.
+      specialize (substore_extension_left _ s1 s4 v x Hst) as Hsub1.
+      now forward Hsub1 by apply (substore_extension_inv _ _ _ _ _ Hmono).
+    }
+    specialize (IHHb2 H4 Hs2).
+    easy.
 Qed.
