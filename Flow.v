@@ -1,4 +1,3 @@
-
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From CDF Require Import Common Sequences Separation2 Tactics HeapTactics.
 
@@ -6,6 +5,11 @@ Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
+
+Theorem ident_neq_sym : forall (n:ident) m, n <> m -> m <> n.
+Proof.
+  intros n m H1 H2; symmetry in H2; false_hyp H2 H1.
+Qed.
 
 Definition val := Z.
 
@@ -17,12 +21,10 @@ Inductive expr : Type :=
   (* | pderef (x: ident) *)
   (* | passign (x1: ident) (x2: ident) *)
   | pif (x: ident) (e1: expr) (e2: expr)
-  | pcall (x: ident) (a: ident)
-  .
+  | pcall (x: ident) (a: ident).
 
 Inductive eresult : Type :=
-  | enorm : val -> eresult
-.
+  | enorm : val -> eresult.
 
 Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
@@ -47,8 +49,7 @@ Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
   | eval_assign : forall x1 x2 s h,
     eval[ s, h, passign x1 x2 ] => [ s, hupdate (s x1) (s x2) h, enorm 0] *)
 
-  where " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " := (bigstep s h e s1 h1 r)
-.
+  where " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " := (bigstep s h e s1 h1 r).
 
 Module ProgramExamples.
 
@@ -98,9 +99,23 @@ Fixpoint replace_ret x f :=
 Definition compose (x:ident) (f1 f2:flow) : flow :=
   fexists x (replace_ret x f1 ;; f2).
 
-(* Definition replace_ret (x:ident) (f:flow) : flow := fun s1 h1 s2 h2 r =>
-  exists v, Some v = s1 x /\
-  f s1 h1 s2 h2 (norm v). *)
+Fixpoint fresh_in_flow (x:ident) (f:flow) :=
+  match f with
+  | ens q => True
+  | req _ => True
+  | seq a b => fresh_in_flow x a /\ fresh_in_flow x b
+  | fexists i f => x <> i /\ fresh_in_flow x f
+  end.
+
+Lemma fresh_replace : forall f x i,
+  fresh_in_flow i (replace_ret x f) ->
+  fresh_in_flow i f.
+Proof.
+  induction f; intros; simpl in *; intuition auto.
+  - now apply IHf2 with (x:=x).
+  - apply IHf with (x:=x).
+    easy.
+Qed.
 
 (* Reserved Notation " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " (at level 50, left associativity). *)
 
@@ -133,22 +148,11 @@ Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :
   | sat_ex
     x f s1 h1 s2 h2 r
     (Hnotin: s1 x = None)
+    (Hfresh: fresh_in_flow x f)
     (Hex: exists v, satisfies (supdate x v s1) h1 s2 h2 r f) :
-    satisfies s1 h1 s2 h2 r (fexists x f)
-  
+    satisfies s1 h1 s2 h2 r (fexists x f).
 
-    (* f (supdate i v s1) h1 s2 h2 r *)
-  
-    (* sem[true, s1, h1]=>[true, s2, h2, norm r1] |= f1 ->
-    sem[true, s2, h2]=>[c, s3, h3, r2] |= f2 ->
-    st1 = f1 r1 ->
-    st2 = f2 r1 ->
-    ff r1 = (st1;;st2) ->
-    sem[true, s1, h1]=>[c, s3, h3, r2] |= ff *)
-
-
-    (* where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f) *)
-  .
+  (* where " 'sem[' t ',' s ',' h ']=>[' t1 ',' s1 ',' h1 ',' r ']' '|=' f " := (satisfies t s h t1 s1 h1 r f) *)
 
 (** Result can be anything if unconstrained *)
 Lemma unconstrained_res : forall s h v,
@@ -195,6 +199,7 @@ Module SemanticsExamples.
     unfold f3.
     apply sat_ex.
     heap.
+    easy.
     exists 3.
     apply sat_seq with (s3:=supdate "z" 3 (supdate "x" 2 sempty)) (h3:=hempty) (r1:=norm 5).
     - apply sat_req with (h3:=hupdate 2 3 hempty).
@@ -295,6 +300,35 @@ Proof.
     ok.
 Qed.
 
+Lemma satisfies_replace_ret : forall f x v s1 h1 s2 h2 r,
+  fresh_in_flow x f ->
+  s1 x = Some v ->
+  satisfies s1 h1 s2 h2 r (replace_ret x f) ->
+  satisfies s1 h1 s2 h2 (norm v) f.
+Proof.
+  induction f; intros; simpl in *.
+  - inv H1.
+    apply sat_req with (h3 := h4); ok.
+  - inv H1. destruct Hq as [v1 [H3 H2]].
+    rewrite H3 in H0; inj H0.
+    apply sat_ens with (h3 := h4); ok.
+  - inv H1.
+    pose proof (satisfies_monotonic _ _ _ _ _ _ Hs1) as Hmono1.
+    pose proof (substore_mem _ s1 s4 v x Hmono1 H0) as Hs.
+    destruct H as [Hf1 Hf2].
+    specialize (IHf2 x v s4 h4 s2 h2 r Hf2 Hs Hs2).
+    apply sat_seq with (s3:=s4) (h3:=h4) (r1:=r1); ok.
+  - inv H1; destruct Hex as [v0 Hsat].
+    destruct H as [Hneq Hf].
+    pose proof (ident_neq_sym _ _ Hneq) as Hneq1.
+    pose proof (supdate_other _ s1 i v0 x Hneq1) as He. rewrite <- He in H0.
+    specialize (IHf x v (supdate i v0 s1) h1 s2 h2 r Hf H0 Hsat).
+    apply sat_ex; auto.
+    apply fresh_replace with (x:=x); easy.
+    exists v0.
+    auto.
+Qed.
+
 Theorem soundness :
   forall se1 he1 e se2 he2 re (**) f ss1 hs1 ss2 hs2 rs,
     bigstep se1 he1 e se2 he2 re ->
@@ -334,38 +368,35 @@ Proof.
     unfold compatible.
     intuition auto.
   -
-  (* we have an IH for each subexpr *)
-  (* v is the intermediate result of evaluating e1 *)
-  (* r is the final result *)
-  inv Hf.
-  (* the spec is of the form ex x. f1[x/r];f2 *)
-  (* see how it evaluates *)
-  inv Hs.
-  destruct Hex as [v1 Hseq].
-  (* v1 is the return value of f1, which can be anything due to replace ret *)
-  inv Hseq.
+    (* we have an IH for each subexpr *)
+    (* v is the intermediate result of evaluating e1 *)
+    (* r is the final result *)
+    inv Hf.
+    (* the spec is of the form ex x. f1[x/r];f2 *)
+    (* see how it evaluates *)
+    inv Hs.
+    destruct Hex as [v1 Hseq].
+    (* v1 is the return value of f1, which can be anything due to replace ret *)
+    inv Hseq.
+    simpl in Hfresh.
+    destruct Hfresh as [Hfresh1 Hfresh2].
+    pose proof (fresh_replace _ _ _ Hfresh1) as Hfresh3.
 
-  assert (
-    forall x v1 ss1 hs1 s4 h4 r1 f1,
-      satisfies (supdate x v1 ss1) hs1 s4 h4 r1 (replace_ret x f1) ->
-      satisfies ss1 hs1 s4 h4 (norm v1) f1). admit.
-  specialize (H x v1 ss1 hs1 s4 h4 r1 f1 Hs1).
-  specialize (IHHb1 f1 ss1 hs1 s4 h4 (norm v1) Hsub H3 H).
-  destruct IHHb1 as [Hst Hcomp].
+    assert (fresh_in_flow x f1) as Hf. auto.
+    assert ((supdate x v1 ss1) x = Some v1) as Heq. { apply supdate_same. }
+    pose proof (satisfies_replace_ret f1 x v1 (supdate x v1 ss1) hs1 s4 h4 r1 Hf Heq Hs1).
+    (* _ _ Hs1). *)
 
-  (* specialize (IHHb2 f2 (supdate x v s1) h4 ss2 hs2 rs). *)
-  specialize (IHHb2 f2 s4 h4 ss2 hs2 rs).
-  forward IHHb2 by admit.
+    assert (substore s (supdate x v1 ss1)) as Hsub2.
+    { apply substore_extension_trans with (s2:=ss1); auto. }
 
-  assert (s4 x = Some v).
-  admit.
-  (* from wellformed *)
-  assert (s4 = supdate x v s4). admit.
-  rewrite H1 in Hs2.
-  assert (substore (supdate x v s4) (supdate x v1 ss2)). admit.
-  assert (substore s4 ss2). admit.
-  assert (satisfies s4 h4 ss2 hs2 rs f2) as Hs3. admit.
+    specialize (IHHb1 f1 (supdate x v1 ss1) hs1 s4 h4 (norm v1) Hsub2 H3 H).
 
-  specialize (IHHb2 H4 Hs3).
-  intuition.
-Admitted.
+    destruct IHHb1 as [Hst Hcomp].
+    pose proof (satisfies_monotonic _ _ _ _ _ _ Hs1) as Hmono.
+    unfold compatible in Hcomp; subst.
+    pose proof (substore_extension_inv _ _ _ _ _ Hmono) as H0.
+    specialize (substore_extension_left _ s1 s4 v x Hst H0) as Hsub1.
+    specialize (IHHb2 f2 s4 h4 ss2 hs2 rs Hsub1 H4 Hs2).
+    intuition.
+Qed.

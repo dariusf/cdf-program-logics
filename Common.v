@@ -35,6 +35,17 @@ Section Store.
     destruct (string_dec l l); congruence.
   Qed.
 
+  Lemma supdate_noop : forall A s x (v:A), s x = Some v -> supdate x v s = s.
+  Proof.
+    intros.
+    unfold supdate.
+    apply functional_extensionality.
+    intros.
+    destruct (string_dec x x0).
+    - congruence.
+    - reflexivity.
+  Qed.
+
   Lemma supdate_other: forall A (h:store A) l v l',
     l <> l' -> (supdate l v h) l' = h l'.
   Proof.
@@ -104,6 +115,35 @@ Section Store.
     now apply substore_trans with (s2 := s2).
   Qed.
 
+  Lemma substore_extension_inv : forall A (s1 s2:store A) v x,
+    substore (supdate x v s1) s2 ->
+    s2 x = Some v.
+  Proof.
+    unfold substore; intros.
+    apply H.
+    rewrite supdate_same.
+    auto.
+  Qed.
+
+  Lemma substore_mem : forall A (s1 s2:store A) v x,
+    substore s1 s2 ->
+    s1 x = Some v ->
+    s2 x = Some v.
+  Proof.
+    unfold substore; intros.
+    apply H.
+    easy.
+  Qed.
+
+  (** This can't be proved, as substore only concerns bindings which are present *)
+  Lemma substore_mem_contra : forall A (s1 s2:store A) x,
+    substore s1 s2 ->
+    s2 x = None ->
+    s1 x = None.
+  Proof.
+    unfold substore; intros.
+  Abort.
+
   Lemma substore_extension_left : forall A (s1 s2:store A) v x,
     substore s1 s2 ->
     s2 x = Some v ->
@@ -128,17 +168,6 @@ Section Store.
     unfold substore.
     unfold sempty.
     ok.
-  Qed.
-
-  Lemma substore_same : forall A s x (v:A), s x = Some v -> supdate x v s = s.
-  Proof.
-    intros.
-    unfold supdate.
-    apply functional_extensionality.
-    intros.
-    destruct (string_dec x x0).
-    - congruence.
-    - reflexivity.
   Qed.
 
   (** The converse is not true. Consider: (x=1)[x:=2] <= (y=1)[x:=2] *)
