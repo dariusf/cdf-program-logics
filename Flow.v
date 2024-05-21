@@ -1,5 +1,6 @@
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From CDF Require Import Common Sequences Separation2 Tactics HeapTactics.
+From Coq Require Import ssreflect ssrfun ssrbool.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
@@ -190,7 +191,7 @@ Module SemanticsExamples.
 
   (* ex z; req x->z; ens[r] x->1/\r=1 *)
   Definition f3 : flow :=
-    fexists "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
+    fexists "z" (req (pts "x" "z") ;; ens (fun r => (r = 1) //\\ ptsval "x" 1)).
 
   Example ex_sem_f3:
     satisfies (supdate "x" 2 sempty) (hupdate 2 3 hempty)
@@ -259,13 +260,13 @@ Inductive forward : expr -> flow -> Prop :=
 
 Example e_fw_let : forall x,
   forward (plet x (pconst 1) (pvar x)) (fexists x (
-    replace_ret x (ens (fun r => pure (r=1))) ;;
+    replace_ret x (ens (fun r => pure (r = 1))) ;;
     ens (fun res s h => exists v, Some v = s x /\ res = v /\ emp s h)
     )).
 Proof.
   simpl.
   intros.
-  apply fw_let with (f1 := (ens (fun r => pure (r=1)))).
+  apply fw_let with (f1 := (ens (fun r => pure (r = 1)))).
   - eapply fw_const.
     reflexivity.
   - apply fw_var.
@@ -362,10 +363,8 @@ Proof.
     congruence.
   - inv Hf.
     inv Hs.
-    destr_all; subst.
-    unfold pureconj in Hq.
-    destr_all; subst.
     unfold compatible.
+    unfold pureconj in Hq.
     intuition auto.
   -
     (* we have an IH for each subexpr *)
@@ -378,14 +377,15 @@ Proof.
     destruct Hex as [v1 Hseq].
     (* v1 is the return value of f1, which can be anything due to replace ret *)
     inv Hseq.
-    simpl in Hfresh.
-    destruct Hfresh as [Hfresh1 Hfresh2].
-    pose proof (fresh_replace _ _ _ Hfresh1) as Hfresh3.
 
-    assert (fresh_in_flow x f1) as Hf. auto.
+    (* simpl in Hfresh. *)
+    (* destruct Hfresh as [Hfresh1 Hfresh2]. *)
+    (* pose proof (fresh_replace _ _ _ Hfresh1) as Hfresh3. *)
+    move: Hfresh => /= [Hfresh _].
+    move: Hfresh (fresh_replace _ _ _ Hfresh) => _ Hfresh.
+
     assert ((supdate x v1 ss1) x = Some v1) as Heq. { apply supdate_same. }
-    pose proof (satisfies_replace_ret f1 x v1 (supdate x v1 ss1) hs1 s4 h4 r1 Hf Heq Hs1).
-    (* _ _ Hs1). *)
+    pose proof (satisfies_replace_ret f1 x v1 (supdate x v1 ss1) hs1 s4 h4 r1 Hfresh Heq Hs1).
 
     assert (substore s (supdate x v1 ss1)) as Hsub2.
     { apply substore_extension_trans with (s2:=ss1); auto. }
