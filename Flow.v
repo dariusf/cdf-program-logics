@@ -12,18 +12,45 @@ Proof.
   intros n m H1 H2; symmetry in H2; false_hyp H2 H1.
 Qed.
 
+Inductive spec : Type :=
+  | assertion : (val -> Prop) -> spec
+  | conj : spec -> spec -> spec
+
+with expr : Type :=
+  | var (x: string)
+  | int (x: Z)
+  | lamb (x: string) (n: expr) (sp: spec)
+  | apply (x: string) (a: string)
+
+with val : Type :=
+  | vint (i:Z)
+  | vlamb (x:string) (e:expr) (sp: spec).
+
+(* Scheme even_length_mut := Induction for even_length Sort Prop *)
+
+Inductive flow : Type :=
+  | req : assertion term -> flow
+  | ens : term -> assertion term -> flow
+  | seq : flow -> flow -> flow
+  | fn : ident -> ident -> ident -> flow
+  (* | fexists : (Z -> flow) -> flow. *)
+  | fexists : ident -> flow -> flow.
+
 Inductive expr : Type :=
   | pvar (x: ident)
   | pint (n: Z)
-  | plamb (x: ident) (n: expr)
+  | plamb (x: ident) (n: expr) (phi: flow)
   | plet (x: ident) (e1: expr) (e2: expr)
   (* | pref (x: ident) *)
   (* | pderef (x: ident) *)
   (* | passign (x1: ident) (x2: ident) *)
   (* | pif (x: ident) (e1: expr) (e2: expr) *)
-  | pcall (x: ident) (a: ident).
+  | pcall (x: ident) (a: ident)
 
-Coercion pint : Z >-> expr.
+(* Definition expr := expr . *)
+
+(* Coercion pint : Z >-> expr spec. *)
+.
 
 Inductive val : Type :=
   | vloc (i:Z)
@@ -33,7 +60,11 @@ Inductive val : Type :=
   | vclos (x:ident) (e:expr)
   .
 
-Coercion vint : Z >-> val.
+(* with post : Type := *)
+  (* | x : val -> assertion val *)
+  .
+
+(* Coercion vint : Z >-> val. *)
 
 Inductive eresult : Type :=
   | enorm : val -> eresult.
@@ -114,13 +145,6 @@ Definition compatible r1 r2 :=
   | (norm r3, enorm r4) => r3 = r4
 end.
 
-Inductive flow : Type :=
-  | req : precond -> flow
-  | ens : postcond -> flow
-  | seq : flow -> flow -> flow
-  (* | fexists : (Z -> flow) -> flow. *)
-  | fexists : ident -> flow -> flow.
-
 (* Definition flow := Z -> stages. *)
 
 Definition empty := ens (fun r => pure True).
@@ -131,6 +155,7 @@ Fixpoint replace_ret x f :=
   match f with
   | ens q => ens (fun _ s h => exists v, s x = Some v /\ q v s h)
   | req _ => f
+  | fn _ _ _ => f
   | seq a b => seq a (replace_ret x b)
   | fexists i f => fexists i (replace_ret x f)
   end.
@@ -142,6 +167,7 @@ Fixpoint fresh_in_flow (x:ident) (f:flow) :=
   match f with
   | ens q => True
   | req _ => True
+  | fn _ _ _ => True
   | seq a b => fresh_in_flow x a /\ fresh_in_flow x b
   | fexists i f => x <> i /\ fresh_in_flow x f
   end.
@@ -178,6 +204,13 @@ Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :
     (Hd: hdisjoint h1 h3)
     (Hq: q v s1 h3) :
     satisfies s1 h1 s2 h2 (norm v) (ens q)
+
+  | sat_fn s1 h1 s2 h2 r f x y e v res
+    (Hf: s1 f = Some (vclos y e))
+    (Hx: s1 x = Some v)
+    (* (Hs1: satisfies (supdate y v s1) h1 s2 h2 r e) : *)
+    :
+    satisfies s1 h1 s2 h2 r (fn f x res)
 
   | sat_seq f1 f2 s1 h1 s2 h2 r s3 h3 r1
     (Hs1: satisfies s1 h1 s3 h3 r1 f1)
@@ -291,10 +324,11 @@ Inductive forward : expr -> flow -> Prop :=
   | fw_let: forall x e1 e2 f1 f2,
     forward e1 f1 ->
     forward e2 f2 ->
-    (* replace_ret x f1 = f3 -> *)
-    (* f1 ;; ens (fun _ => ) = f3 -> *)
-    (* forward (plet x e1 e2) (fexists x (f3 ;; f2)) *)
     forward (plet x e1 e2) (compose x f1 f2)
+
+  | fw_call: forall x f f1,
+    (exists r, fn f x r = f1) ->
+    forward (pcall f x) f1
 
   (* | fw_get: forall l v, 
     forward (GET l)
@@ -338,6 +372,7 @@ Proof.
     specialize (IHf1 _ _ _ _ _ Hs1).
     specialize (IHf2 _ _ _ _ _ Hs2).
     apply substore_trans with (s2 := s4); auto.
+  - inv H.
   - inv H.
     destruct Hex as [v Hsat].
     specialize (IHf _ _ _ _ _ Hsat).
