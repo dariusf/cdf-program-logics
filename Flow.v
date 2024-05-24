@@ -29,7 +29,8 @@ Inductive val : Type :=
   | vloc (i:Z)
   | vint (i:Z)
   (* need to relate free variables used in a lambda formula to those in the captured env *)
-  | vclos (x:ident) (e:expr) (s:store val)
+  (* | vclos (x:ident) (e:expr) (s:store val) *)
+  | vclos (x:ident) (e:expr)
   .
 
 Coercion vint : Z >-> val.
@@ -49,7 +50,8 @@ Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     eval[ s, h, pvar x ]=>[ s, h, enorm v ]
 
   | eval_plamb : forall s h x e,
-    eval[ s, h, plamb x e ]=>[ s, h, enorm (vclos x e s) ]
+    eval[ s, h, plamb x e ]=>[ s, h, enorm (vclos x e) ]
+    (* eval[ s, h, plamb x e ]=>[ s, h, enorm (vclos x e s) ] *)
 
   | eval_pint : forall s h x,
     eval[ s, h, pint x ] => [ s, h, enorm (vint x) ]
@@ -60,7 +62,8 @@ Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     eval[ s, h, plet x e1 e2 ] => [ s2, h2, r ]
 
   | eval_pcall : forall fn x y e1 sf s h s2 h1 r arg,
-    s fn = Some (vclos y e1 sf) ->
+    (* s fn = Some (vclos y e1 sf) -> *)
+    s fn = Some (vclos y e1) ->
     s x = Some arg ->
     eval[ supdate y arg sf, h, e1 ] => [ s2, h1, r ] ->
     eval[ s, h, pcall fn x ] => [ s, h1, r ]
@@ -267,9 +270,10 @@ Inductive forward : expr -> flow -> Prop :=
     p = (ens (fun res => (res = vint i) //\\ emp)) ->
     forward (pint i) p
 
-  | fw_lamb: forall x p e s,
+  | fw_lamb: forall x p e,
     (* cannot check the spec at this point, as lambdas containing flows would be mutually recursive *)
-    p = (ens (fun res => (res = vclos x e s) //\\ emp)) ->
+    (* p = (ens (fun res => (res = vclos x e s) //\\ emp)) -> *)
+    p = (ens (fun res => (res = vclos x e) //\\ emp)) ->
     forward (plamb x e) p
 
   | fw_var: forall x p,
@@ -409,7 +413,6 @@ Proof.
     unfold pureconj in Hq.
     unfold compatible.
     intuition auto.
-    admit.
   - (* int *)
     inv Hf.
     inv Hs.
@@ -457,5 +460,5 @@ Proof.
     easy.
   - (* call *)
   inv Hf.
-(* Qed. *)
-Admitted.
+Qed.
+(* Admitted. *)
