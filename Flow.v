@@ -12,36 +12,48 @@ Proof.
   intros n m H1 H2; symmetry in H2; false_hyp H2 H1.
 Qed.
 
-Definition val := Z.
-
 Inductive expr : Type :=
   | pvar (x: ident)
-  | pconst (n: val)
+  | pint (n: Z)
+  | plamb (x: ident) (n: expr)
   | plet (x: ident) (e1: expr) (e2: expr)
   (* | pref (x: ident) *)
   (* | pderef (x: ident) *)
   (* | passign (x1: ident) (x2: ident) *)
-  | pif (x: ident) (e1: expr) (e2: expr)
+  (* | pif (x: ident) (e1: expr) (e2: expr) *)
   | pcall (x: ident) (a: ident).
+
+Coercion pint : Z >-> expr.
+
+Inductive val : Type :=
+  | vloc (i:Z)
+  | vint (i:Z)
+  | vclos (x:ident) (e:expr) (s:store val).
+
+Coercion vint : Z >-> val.
 
 Inductive eresult : Type :=
   | enorm : val -> eresult.
 
 Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
-Definition store := store Z.
-Definition heap := heap Z.
+Definition store := store val.
+Definition heap := heap val.
 
 Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
+
   | eval_pvar : forall s h x v,
     Some v = s x ->
-    eval[ s, h, pvar x ]=>[ s, h, enorm v]
-  | eval_pconst : forall s h x,
-    eval[ s, h, pconst x ] => [ s, h, enorm x]
+    eval[ s, h, pvar x ]=>[ s, h, enorm v ]
+
+  | eval_pint : forall s h x,
+    eval[ s, h, pint x ] => [ s, h, enorm (vint x) ]
+
   | eval_plet : forall x e1 e2 v s h h2 s2 s1 h1 r,
     eval[ s, h, e1 ] => [ s1, h1, enorm v] ->
     eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r] ->
     eval[ s, h, plet x e1 e2 ] => [ s2, h2, r ]
+
   (* | eval_pref : forall x s (h:heap) l,
     h l = None ->
     eval[ s, h, pref x ] => [ s, hupdate l (s x) h, enorm l]
@@ -72,16 +84,16 @@ Definition postcond := val -> assertion.
 
 Definition pts (x: ident) (y: ident) : assertion :=
   fun s h =>
-    exists v w, Some v = s x /\ Some w = s y /\
+    exists v w, Some (vint v) = s x /\ Some w = s y /\
       (contains v w) s h.
 
 Definition ptsval (x: ident) (v: val) : assertion :=
   fun s h =>
-    exists w, Some w = s x /\
+    exists w, Some (vint w) = s x /\
       (contains w v) s h.
 
 Inductive result : Type :=
-  | norm : Z -> result.
+  | norm : val -> result.
 
 Definition compatible r1 r2 :=
   match (r1, r2) with
@@ -143,7 +155,7 @@ Inductive satisfies : store -> heap -> store -> heap -> result -> flow -> Prop :
     (Hp: p s1 h3) :
     satisfies s1 h1 s2 h2 (norm r) (req p)
 
-  | sat_ens q s1 h1 s2 h2 h3 v
+  | sat_ens q s1 h1 s2 h2 h3 (v:val)
     (Hsu:s1 = s2)
     (* forall v, r = norm v -> *)
     (* (Hr: r = norm v) *)
@@ -180,7 +192,7 @@ Qed.
 (** replace_ret removes the result value and constrains the given variable *)
 Example e_replace_ret : forall x s h,
   satisfies s h s h (norm 2) (replace_ret x (ens (fun r => pure (r = 1)))) <->
-    satisfies s h s h (norm 2) (ens (fun r s h => s x = Some 1)).
+    satisfies s h s h (norm 2) (ens (fun r s h => s x = Some (vint 1))).
 Proof.
   split.
   - intros.
@@ -207,24 +219,24 @@ Module SemanticsExamples.
     fexists "z" (req (pts "x" "z") ;; ens (fun r => (r = 1) //\\ ptsval "x" 1)).
 
   Example ex_sem_f3:
-    satisfies (supdate "x" 2 sempty) (hupdate 2 3 hempty)
-      (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1) f3.
+    satisfies (supdate "x" (vint 2) sempty) (hupdate 2 (vint 3) hempty)
+      (supdate "z" (vint 3) (supdate "x" (vint 2) sempty)) (hupdate 2 (vint 1) hempty) (norm (vint 1)) f3.
   Proof.
     unfold f3.
     apply sat_ex.
     heap.
     easy.
-    exists 3.
-    apply sat_seq with (s3:=supdate "z" 3 (supdate "x" 2 sempty)) (h3:=hempty) (r1:=norm 5).
-    - apply sat_req with (h3:=hupdate 2 3 hempty).
+    exists (vint 3).
+    apply sat_seq with (s3:=supdate "z" (vint 3) (supdate "x" (vint 2) sempty)) (h3:=hempty) (r1:=norm (vint 5)).
+    - apply sat_req with (h3:=hupdate 2 (vint 3) hempty).
       reflexivity.
       heap.
       heap.
       unfold pts.
       exists 2.
-      exists 3.
+      exists (vint 3).
       intuition easy.
-    - apply sat_ens with (h3:=hupdate 2 1 hempty); heap.
+    - apply sat_ens with (h3:=hupdate 2 (vint 1) hempty); heap.
       (* rewrite supdate_dupe. *)
       (* reflexivity. *)
       unfold pureconj.
@@ -241,9 +253,9 @@ End SemanticsExamples.
 
 (* forward rules say how to produce a staged formula from a program *)
 Inductive forward : expr -> flow -> Prop :=
-  | fw_const: forall n p,
-    p = (ens (fun res => (res = n) //\\ emp)) ->
-    forward (pconst n) p
+  | fw_int: forall i p,
+    p = (ens (fun res => (res = vint i) //\\ emp)) ->
+    forward (pint i) p
 
   | fw_var: forall x p,
     p = (ens (fun res s h => exists v, s x = Some v /\ res = v /\ emp s h)) ->
@@ -272,7 +284,7 @@ Inductive forward : expr -> flow -> Prop :=
 .
 
 Example e_fw_let : forall x,
-  forward (plet x (pconst 1) (pvar x)) (fexists x (
+  forward (plet x 1 (pvar x)) (fexists x (
     replace_ret x (ens (fun r => pure (r = 1))) ;;
     ens (fun res s h => exists v, Some v = s x /\ res = v /\ emp s h)
     )).
@@ -280,7 +292,7 @@ Proof.
   simpl.
   intros.
   apply fw_let with (f1 := (ens (fun r => pure (r = 1)))).
-  - eapply fw_const.
+  - eapply fw_int.
     reflexivity.
   - apply fw_var.
     (* trivial from here, but we have to go through this whole song and dance *)
