@@ -27,24 +27,42 @@ Fixpoint interp {A:Type} (s:store A) (f:sl) : Prop :=
 
 Set Implicit Arguments.
 
+Inductive term (T:Type) : Type :=
+  | tvar (x:ident)
+  | tval (a:T).
+
+Definition replace_term {T:Type} (x:ident) (v:ident) (t:term T) :=
+  match t with
+  | tvar _ y => if string_dec x y then tvar _ v else t
+  | tval _  => t
+  end.
+
 Inductive pure (T:Type) : Type :=
-  (* | peq (a:T) (b:T) *)
-  | peq : T -> T -> pure T
+  | peq (a:term T) (b:term T)
   | ptrue
-  (* | pfalse *)
-  (* | por (a:pure T) (b:pure T) *)
-  (* | pimply (a:pure T) (b:pure T) *)
-  (* | pand (a:pure T) (b:pure T) *)
-  | pand : pure T -> pure T -> pure T.
+  | pfalse
+  | por (a:pure T) (b:pure T)
+  | pimply (a:pure T) (b:pure T)
+  | pand (a:pure T) (b:pure T).
+
+Fixpoint replace_pure {T:Type} (x:ident) (v:ident) (p:pure T) :=
+  match p with
+  | peq a b => peq (replace_term x v a) (replace_term x v b)
+  | ptrue _ => p
+  | pfalse _ => p
+  | por a b => por (replace_pure x v a) (replace_pure x v b)
+  | pand a b => pand (replace_pure x v a) (replace_pure x v b)
+  | pimply a b => pimply (replace_pure x v a) (replace_pure x v b)
+  end.
 
 Fixpoint pure_satisfies {A:Type} (s:store A) (p:pure A) : Prop :=
   match p with
   | peq a b => a = b
   | ptrue _ => True
-  (* | pfalse => False *)
-  (* | por a b => pure_satisfies s a \/ pure_satisfies s b *)
+  | pfalse _ => False
+  | por a b => pure_satisfies s a \/ pure_satisfies s b
   | pand a b => pure_satisfies s a /\ pure_satisfies s b
-  (* | pimply a b => pure_satisfies s a -> pure_satisfies s b *)
+  | pimply a b => pure_satisfies s a -> pure_satisfies s b
   end.
 
 Inductive sl (T:Type) : Type :=
@@ -52,6 +70,14 @@ Inductive sl (T:Type) : Type :=
   | sep (a:sl T) (b:sl T)
   | pts_to (a:addr) (b:ident)
   | emp.
+
+Fixpoint replace_sl {T:Type} (x:ident) (v:ident) (s:sl T) :=
+  match s with
+  | pi p => pi (replace_pure x v p)
+  | sep a b => sep (replace_sl x v a) (replace_sl x v b)
+  | pts_to _ _ _ => s
+  | emp _ => s
+  end.
 
 Fixpoint sl_satisfies {A:Type} (s:store A) (h:heap A) (f:sl A) : Prop :=
   match f with
