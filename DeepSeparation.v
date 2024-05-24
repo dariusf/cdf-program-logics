@@ -8,7 +8,67 @@ Local Open Scope Z_scope.
 
 (** * 2. Assertions for separation logic *)
 
-Definition assertion (A:Type) : Type := store A -> heap A -> Prop.
+(* Inductive term : Type :=
+  | tvar (x:ident)
+  | tint (i:Z)
+  | tloc (l:Z).
+
+Fixpoint interp {A:Type} (s:store A) (f:sl) : Prop :=
+  match f with
+  | pure p => p
+  | sep a b =>
+    exists h1 h2, slsatisfies s h1 a /\ slsatisfies s h2 b /\
+      hdisjoint h1 h2 /\ h = hunion h1 h2
+  | pts_to x v => forall v1,
+    s v = Some v1 ->
+    h = hupdate x v1 hempty
+  | emp => h = hempty
+  end. *)
+
+Set Implicit Arguments.
+
+Inductive pure (T:Type) : Type :=
+  (* | peq (a:T) (b:T) *)
+  | peq : T -> T -> pure T
+  | ptrue
+  (* | pfalse *)
+  (* | por (a:pure T) (b:pure T) *)
+  (* | pimply (a:pure T) (b:pure T) *)
+  (* | pand (a:pure T) (b:pure T) *)
+  | pand : pure T -> pure T -> pure T.
+
+Fixpoint pure_satisfies {A:Type} (s:store A) (p:pure A) : Prop :=
+  match p with
+  | peq a b => a = b
+  | ptrue _ => True
+  (* | pfalse => False *)
+  (* | por a b => pure_satisfies s a \/ pure_satisfies s b *)
+  | pand a b => pure_satisfies s a /\ pure_satisfies s b
+  (* | pimply a b => pure_satisfies s a -> pure_satisfies s b *)
+  end.
+
+Inductive sl (T:Type) : Type :=
+  | pi (p:pure T)
+  | sep (a:sl T) (b:sl T)
+  | pts_to (a:addr) (b:ident)
+  | emp.
+
+Fixpoint sl_satisfies {A:Type} (s:store A) (h:heap A) (f:sl A) : Prop :=
+  match f with
+  | pi p => pure_satisfies s p
+  | sep a b =>
+    exists h1 h2, sl_satisfies s h1 a /\ sl_satisfies s h2 b /\
+      hdisjoint h1 h2 /\ h = hunion h1 h2
+  | pts_to _ x v => forall v1,
+    s v = Some v1 ->
+    h = hupdate x v1 hempty
+  | emp _ => h = hempty
+  end.
+
+(* Inductive slf :=
+  | pts . *)
+
+(* Definition assertion (A:Type) : Type := store A -> heap A -> Prop.
 
 (** Implication (entailment). *)
 
@@ -433,4 +493,4 @@ Proof.
   congruence.
 Qed.
 
-*)
+*) *)
