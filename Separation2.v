@@ -13,13 +13,13 @@ Local Open Scope Z_scope.
 
 Definition addr := Z.
 
-Record heap : Type := {
-  contents :> addr -> option Z;
-  isfinite :  exists i, forall j, i <= j -> contents j = None
+Record heap (A:Type) : Type := {
+  contents :> addr -> option A;
+  isfinite : exists i, forall j, i <= j -> contents j = None
 }.
 
 Lemma heap_extensionality:
-  forall (h1 h2: heap),
+  forall (A:Type) (h1 h2: heap A),
   (forall l, h1 l = h2 l) -> h1 = h2.
 Proof.
   intros. destruct h1 as [c1 fin1], h2 as [c2 fin2].
@@ -29,7 +29,7 @@ Qed.
 
 (** The empty heap. *)
 
-Program Definition hempty : heap :=
+Program Definition hempty {A:Type} : heap A :=
   {| contents := fun l => None |}.
 Next Obligation.
   exists 0; auto.
@@ -38,39 +38,39 @@ Qed.
 (** The heap that contains [v] at address [l] and is equal to [h] on
     all other addresses. *)
 
-Program Definition hupdate (l: addr) (v: Z) (h: heap) : heap :=
+Program Definition hupdate {A:Type} (l: addr) (v: A) (h: heap A) : heap A :=
   {| contents := fun l' => if Z.eq_dec l l' then Some v else h l' |}.
 Next Obligation.
-  destruct (isfinite h) as (i & fin).
+  destruct (isfinite A h) as (i & fin).
   exists (Z.max i (l + 1)); intros.
   destruct (Z.eq_dec l j). lia. apply fin; lia.
 Qed.
 
-Lemma hupdate_same: forall l v h, (hupdate l v h) l = Some v.
+Lemma hupdate_same: forall {A:Type} l (v:A) h, (hupdate l v h) l = Some v.
 Proof.
   intros; cbn. destruct (Z.eq_dec l l); congruence.
 Qed.
 
-Lemma hupdate_other: forall l v h l', l <> l' -> (hupdate l v h) l' = h l'.
+Lemma hupdate_other: forall {A:Type} l (v:A) h l', l <> l' -> (hupdate l v h) l' = h l'.
 Proof.
   intros; cbn. destruct (Z.eq_dec l l'); congruence.
 Qed.
 
-Definition hsingle (l: addr) (v: Z) : heap :=
+Definition hsingle {A:Type} (l: addr) (v: A) : heap A :=
   hupdate l v hempty.
 
 (** The heap [h] after deallocating address [l]. *)
 
-Program Definition hfree (l: addr) (h: heap) : heap :=
+Program Definition hfree {A:Type} (l: addr) (h: heap A) : heap A :=
   {| contents := fun l' => if Z.eq_dec l l' then None else h l' |}.
 Next Obligation.
-  destruct (isfinite h) as (i & fin).
+  destruct (isfinite A h) as (i & fin).
   exists i; intros. destruct (Z.eq_dec l j); auto.
 Qed.
 
 (** The heap [h] where addresses [l, ..., l + sz - 1] are initialized to 0. *)
 
-Fixpoint hinit (l: addr) (sz: nat) (h: heap) : heap :=
+(* Fixpoint hinit {A:Type} (l: addr) (sz: nat) (h: heap A) : heap A :=
   match sz with O => h | S sz => hupdate l 0 (hinit (l + 1) sz h) end.
 
 Lemma hinit_inside:
@@ -87,47 +87,47 @@ Proof.
   induction sz; intros; cbn.
 - auto.
 - destruct (Z.eq_dec l l'). lia. apply IHsz; lia.
-Qed.
+Qed. *)
 
 (** The disjoint union of two heaps. *)
 
-Definition hdisjoint (h1 h2: heap) : Prop :=
+Definition hdisjoint {A:Type} (h1 h2: heap A) : Prop :=
   forall l, h1 l = None \/ h2 l = None.
 
 Lemma hdisjoint_sym:
-  forall h1 h2, hdisjoint h1 h2 <-> hdisjoint h2 h1.
+  forall {A:Type} (h1 h2:heap A), hdisjoint h1 h2 <-> hdisjoint h2 h1.
 Proof.
   unfold hdisjoint; intros; split; intros H l; specialize (H l); tauto.
 Qed.
 
-Program Definition hunion (h1 h2: heap) : heap :=
+Program Definition hunion {A:Type} (h1 h2: heap A) : heap A :=
   {| contents := fun l => if h1 l then h1 l else h2 l |}.
 Next Obligation.
-  destruct (isfinite h1) as (i1 & fin1), (isfinite h2) as (i2 & fin2).
+  destruct (isfinite A h1) as (i1 & fin1), (isfinite A h2) as (i2 & fin2).
   exists (Z.max i1 i2); intros. rewrite fin1, fin2 by lia. auto.
 Qed.
 
 Lemma hunion_comm:
-  forall h1 h2, hdisjoint h1 h2 -> hunion h2 h1 = hunion h1 h2.
+  forall {A:Type} (h1 h2:heap A), hdisjoint h1 h2 -> hunion h2 h1 = hunion h1 h2.
 Proof.
   intros; apply heap_extensionality; intros; cbn.
   specialize (H l). destruct (h1 l), (h2 l); intuition congruence.
 Qed.
 
 Lemma hunion_assoc:
-  forall h1 h2 h3, hunion (hunion h1 h2) h3 = hunion h1 (hunion h2 h3).
+  forall {A:Type} (h1 h2 h3:heap A), hunion (hunion h1 h2) h3 = hunion h1 (hunion h2 h3).
 Proof.
   intros; apply heap_extensionality; intros; cbn. destruct (h1 l); auto.
 Qed.
 
 Lemma hunion_empty:
-  forall h, hunion hempty h = h.
+  forall {A:Type} (h:heap A), hunion hempty h = h.
 Proof.
   intros; apply heap_extensionality; intros; cbn. auto.
 Qed.
 
 Lemma hunion_refl:
-  forall h, hunion h h = h.
+  forall {A:Type} (h: heap A), hunion h h = h.
 Proof.
   intros; apply heap_extensionality; intros; cbn.
   destruct (h l); auto.
@@ -154,7 +154,7 @@ Proof.
 Qed. *)
 
 Lemma hdisjoint_empty:
-  forall h, hdisjoint hempty h.
+  forall {A:Type} (h:heap A), hdisjoint hempty h.
 Proof.
   intros.
   unfold hdisjoint; intros.
@@ -163,7 +163,7 @@ Proof.
 Qed.
 
 Lemma hdisjoint_union_l:
-  forall h1 h2 h3,
+  forall {A:Type} (h1 h2 h3: heap A),
   hdisjoint (hunion h1 h2) h3 <-> hdisjoint h1 h3 /\ hdisjoint h2 h3.
 Proof.
   unfold hdisjoint, hunion; cbn; intros. split.
@@ -173,7 +173,7 @@ Proof.
 Qed.
 
 Lemma hdisjoint_union_r:
-  forall h1 h2 h3,
+  forall {A:Type} (h1 h2 h3: heap A),
   hdisjoint h1 (hunion h2 h3) <-> hdisjoint h1 h2 /\ hdisjoint h1 h3.
 Proof.
   intros. rewrite hdisjoint_sym. rewrite hdisjoint_union_l. 
@@ -182,7 +182,7 @@ Qed.
 
 (** Disjointness between three heaps. *)
 
-Definition hdisj3 (h1 h2 h3: heap) :=
+Definition hdisj3 {A:Type} (h1 h2 h3: heap A) :=
   hdisjoint h1 h2 /\ hdisjoint h1 h3 /\ hdisjoint h2 h3.
 
 (** A tactic to prove disjointness statements. *)
@@ -211,7 +211,7 @@ Ltac HDISJ :=
   end.
 
 Lemma hunion_invert_r:
-  forall h1 h2 h,
+  forall {A:Type} (h1 h2 h:heap A),
   hunion h h1 = hunion h h2 -> hdisjoint h h1 -> hdisjoint h h2 -> h1 = h2.
 Proof.
   intros. apply heap_extensionality; intros l.
@@ -220,7 +220,7 @@ Proof.
 Qed.
 
 Lemma hunion_invert_l:
-  forall h1 h2 h,
+  forall {A:Type} (h1 h2 h: heap A),
   hunion h1 h = hunion h2 h -> hdisjoint h1 h -> hdisjoint h2 h -> h1 = h2.
 Proof.
   intros. apply hunion_invert_r with h.
@@ -230,57 +230,57 @@ Qed.
 
 (** * 2. Assertions for separation logic *)
 
-Definition assertion : Type := store Z -> heap -> Prop.
+Definition assertion (A:Type) : Type := store A -> heap A -> Prop.
 
 (** Implication (entailment). *)
 
-Definition aimp (P Q: assertion) : Prop :=
+Definition aimp {A:Type} (P Q: assertion A) : Prop :=
   forall s h, P s h -> Q s h.
 
 Notation "P -->> Q" := (aimp P Q) (at level 95, no associativity).
 
 (** Quantification. *)
 
-Definition aexists {A: Type} (P: A -> assertion) : assertion :=
+Definition aexists {A: Type} {T} (P: A -> assertion T) : assertion T :=
   fun s h => exists a: A, P a s h.
 
-Definition aforall {A: Type} (P: A -> assertion) : assertion :=
+Definition aforall {A: Type} {T} (P: A -> assertion T) : assertion T :=
   fun s h => forall a: A, P a s h.
 
 (** The assertion "the heap is empty". *)
 
-Definition emp : assertion :=
+Definition emp {A:Type} : assertion A :=
   fun s h => h = hempty.
 
 (** The pure assertion: "the heap is empty and P holds". *)
 
-Definition pure (P: Prop) : assertion :=
+Definition pure {A:Type} (P: Prop) : assertion A :=
   fun s h => P /\ h = hempty.
   (* TODO pure assertions *)
 
 (** The assertion "address [l] contains value [v]". 
     The domain of the heap must be the singleton [{l}]. *)
 
-Definition contains (l: addr) (v: Z) : assertion :=
+Definition contains {A:Type} (l: addr) (v: A) : assertion A :=
   fun s h => h = hupdate l v hempty.
 
-Definition pts (x: ident) (y: ident) : assertion :=
+(* Definition pts {A:Type} (x: ident) (y: ident) : assertion A :=
   fun s h =>
     exists v w, Some v = s x /\ Some w = s y /\
-      contains v w s h.
+      (contains v w) s h. *)
 
-Definition ptsval (x: ident) (v: Z) : assertion :=
+(* Definition ptsval {A:Type} (x: ident) (v: A) : assertion A :=
   fun s h =>
     exists w, Some w = s x /\
-      contains w v s h.
+      (contains w v) s h. *)
 
 (** The assertion "address [l] is valid" (i.e. in the domain of the heap). *)
 
-Definition valid (l: addr) : assertion := aexists (contains l).
+Definition valid {A:Type} (l: addr) : assertion A := aexists (contains l).
 
 (** The separating conjunction. *)
 
-Definition sepconj (P Q: assertion) : assertion :=
+Definition sepconj {A:Type} (P Q: assertion A) : assertion A :=
   fun s h => exists h1 h2, P s h1
                       /\ Q s h2
                       /\ hdisjoint h1 h2  /\ h = hunion h1 h2.
@@ -289,7 +289,7 @@ Notation "P ** Q" := (sepconj P Q) (at level 60, right associativity).
 
 (** The conjunction of a simple assertion and a general assertion. *)
 
-Definition pureconj (P: Prop) (Q: assertion) : assertion :=
+Definition pureconj {A:Type} (P: Prop) (Q: assertion A) : assertion A :=
   fun s h => P /\ Q s h.
   (* TODO pure assertions *)
 
@@ -297,15 +297,15 @@ Notation "P //\\ Q" := (pureconj P Q) (at level 60, right associativity).
 
 (** Plain conjunction and disjunction. *)
 
-Definition aand (P Q: assertion) : assertion :=
+Definition aand {A:Type} (P Q: assertion A) : assertion A :=
   fun s h => P s h /\ Q s h.
-Definition aor (P Q: assertion) : assertion :=
+Definition aor {A:Type} (P Q: assertion A) : assertion A :=
   fun s h => P s h \/ Q s h.
 
 (** Extensional equality between assertions. *)
 
 Lemma assertion_extensionality:
-  forall (P Q: assertion),
+  forall {A:Type} (P Q: assertion A),
   (forall s h, P s h <-> Q s h) -> P = Q.
 Proof.
   intros. apply functional_extensionality. intros s.
@@ -315,17 +315,17 @@ Qed.
 
 (** ** Properties of separating conjunction *)
 
-Lemma sepconj_comm: forall P Q, P ** Q = Q ** P.
+Lemma sepconj_comm: forall {A:Type} (P Q:assertion A), P ** Q = Q ** P.
 Proof.
-  assert (forall P Q s h, (P ** Q) s h -> (Q ** P) s h).
-  { intros P Q s h (h1 & h2 & P1 & Q2 & EQ & DISJ); subst h.
+  assert (forall {A:Type} (P Q:assertion A) s h, (P ** Q) s h -> (Q ** P) s h).
+  { intros A P Q s h (h1 & h2 & P1 & Q2 & EQ & DISJ); subst h.
     exists h2, h1; intuition auto.
     apply hdisjoint_sym; auto.
     symmetry; apply hunion_comm; auto. } 
   intros; apply assertion_extensionality; intros; split; auto.
 Qed.
 
-Lemma sepconj_assoc: forall P Q R, (P ** Q) ** R = P ** (Q ** R).
+Lemma sepconj_assoc: forall {A:Type} (P Q R:assertion A), (P ** Q) ** R = P ** (Q ** R).
 Proof.
   intros; apply assertion_extensionality; intros; split.
 - intros (hx & h3 & (h1 & h2 & P1 & Q2 & EQ & DISJ) & R3 & EQ' & DISJ'). subst hx h.
@@ -340,7 +340,7 @@ Proof.
   rewrite hdisjoint_union_l; tauto.
 Qed.
 
-Lemma sepconj_emp: forall P, emp ** P = P.
+Lemma sepconj_emp: forall {A:Type} (P:assertion A), emp ** P = P.
 Proof.
   intros; apply assertion_extensionality; intros; split.
 - intros (h1 & h2 & EMP1 & P2 & EQ & DISJ). red in EMP1. subst h h1.
@@ -351,14 +351,14 @@ Proof.
   rewrite hunion_empty; auto.
 Qed.
 
-Lemma sepconj_imp_l: forall P Q R,
+Lemma sepconj_imp_l: forall {A:Type} (P Q R:assertion A),
   (P -->> Q) -> (P ** R -->> Q ** R).
 Proof.
-  intros P Q R IMP s h (h1 & h2 & P1 & Q2 & D & U).
+  intros A P Q R IMP s h (h1 & h2 & P1 & Q2 & D & U).
   exists h1, h2; intuition auto.
 Qed.
 
-Lemma sepconj_imp_r: forall P Q R,
+Lemma sepconj_imp_r: forall {A:Type} (P Q R:assertion A),
   (P -->> Q) -> (R ** P -->> R ** Q).
 Proof.
   intros. rewrite ! (sepconj_comm R). apply sepconj_imp_l; auto.
@@ -366,8 +366,8 @@ Qed.
 
 (** ** Other useful logical properties *)
 
-Lemma pure_sep: forall P Q,
-  pure (P /\ Q) = pure P ** pure Q.
+Lemma pure_sep: forall {T:Type} (P Q:Prop),
+  pure (P /\ Q) = (pure P:assertion T) ** pure Q.
 Proof.
   intros. apply assertion_extensionality; intros.
   unfold pure, sepconj. split.
@@ -378,7 +378,7 @@ Proof.
   subst. rewrite hunion_empty; auto.
 Qed.
 
-Lemma pureconj_sepconj: forall P Q,
+Lemma pureconj_sepconj: forall {T} (P:Prop) (Q:assertion T),
   pure P ** Q = P //\\ Q.
 Proof.
   intros. apply assertion_extensionality; intros.
@@ -390,12 +390,12 @@ Proof.
   rewrite hunion_empty; auto.
 Qed.
 
-Lemma lift_pureconj: forall P Q R, (P //\\ Q) ** R = P //\\ (Q ** R).
+Lemma lift_pureconj: forall {A:Type} (P:Prop) (Q R:assertion A), (P //\\ Q) ** R = P //\\ (Q ** R).
 Proof.
   intros. rewrite <- ! pureconj_sepconj. rewrite sepconj_assoc. auto.
 Qed.
 
-Lemma lift_aexists: forall (A: Type) (P: A -> assertion) Q,
+Lemma lift_aexists: forall (A: Type) (P: A -> assertion A) (Q:assertion A),
   aexists P ** Q = aexists (fun x => P x ** Q).
 Proof.
   intros; apply assertion_extensionality; intros; split.
@@ -405,59 +405,63 @@ Proof.
   exists h1, h2; intuition auto. exists a; auto.
 Qed.
 
-Lemma sepconj_swap3: forall R P Q, P ** Q ** R = R ** P ** Q.
+Lemma sepconj_swap3: forall {A:Type} (R P Q:assertion A),
+  P ** Q ** R = R ** P ** Q.
 Proof.
   intros. rewrite <- sepconj_assoc, sepconj_comm. auto.
 Qed. 
 
-Lemma sepconj_swap4: forall S P Q R, P ** Q ** R ** S = S ** P ** Q ** R.
+Lemma sepconj_swap4: forall {A:Type} (S P Q R:assertion A),
+  P ** Q ** R ** S = S ** P ** Q ** R.
 Proof.
   intros. rewrite <- sepconj_assoc, sepconj_swap3, sepconj_assoc. auto.
 Qed. 
 
-Lemma sepconj_pick2: forall Q P R, P ** Q ** R = Q ** P ** R.
+Lemma sepconj_pick2: forall {A:Type} (Q P R:assertion A),
+  P ** Q ** R = Q ** P ** R.
 Proof.
   intros. rewrite (sepconj_comm Q), <- sepconj_assoc, sepconj_comm. auto.
 Qed. 
 
-Lemma sepconj_pick3: forall R P Q S, P ** Q ** R ** S = R ** P ** Q ** S.
+Lemma sepconj_pick3: forall {A:Type} (R P Q S:assertion A),
+  P ** Q ** R ** S = R ** P ** Q ** S.
 Proof.
   intros. rewrite (sepconj_pick2 R), (sepconj_pick2 P). auto. 
 Qed.
 
 (** ** Magic wand *)
 
-Definition wand (P Q: assertion) : assertion :=
+Definition wand {A:Type} (P Q: assertion A) : assertion A :=
   fun s h => forall h', hdisjoint h h' -> P s h' -> Q s (hunion h h').
 
 Notation "P --* Q" := (wand P Q) (at level 70, right associativity).
 
-Lemma wand_intro: forall P Q R,
+Lemma wand_intro: forall {A:Type} (P Q R:assertion A),
   P ** Q -->> R  ->  P -->> Q --* R.
 Proof.
-  intros P Q R IMP s h Ph h' DISJ Qh'.
+  intros A P Q R IMP s h Ph h' DISJ Qh'.
   apply IMP. exists h, h'; auto.
 Qed.
 
-Lemma wand_cancel: forall P Q,
+Lemma wand_cancel: forall {A:Type} {P Q:assertion A},
   P ** (P --* Q) -->> Q.
 Proof.
-  intros P Q s h (h1 & h2 & Ph1 & Wh2 & D & U). subst h.
+  intros A P Q s h (h1 & h2 & Ph1 & Wh2 & D & U). subst h.
   assert (D': hdisjoint h2 h1) by (apply hdisjoint_sym; auto).
   rewrite hunion_comm by auto. apply Wh2; auto.
 Qed.
 
-Lemma wand_charact: forall P Q,
+Lemma wand_charact: forall {T:Type} (P Q:assertion T),
   (P --*Q) = (aexists (fun R => (P ** R -->> Q) //\\ R)).
 Proof.
-  intros P Q; apply assertion_extensionality; intros s h; split.
+  intros T P Q; apply assertion_extensionality; intros s h; split.
 - intros W. exists (P --* Q). split; auto. apply wand_cancel.
 - intros (R & A & B) h' D Ph'.
   assert (D': hdisjoint h' h) by (apply hdisjoint_sym; auto).
   rewrite hunion_comm by auto. apply A. exists h', h; auto.
 Qed.
 
-Lemma wand_equiv: forall P Q R,
+Lemma wand_equiv: forall {A:Type} (P Q R:assertion A),
   (P -->> (Q --* R)) <-> (P ** Q -->> R).
 Proof.
   intros; split; intros H.
@@ -466,33 +470,33 @@ Proof.
 - apply wand_intro; auto.
 Qed.
 
-Lemma wand_imp_l: forall P P' Q,
+Lemma wand_imp_l: forall {A:Type} (P P' Q:assertion A),
   (P' -->> P) -> (P --* Q -->> P' --* Q).
 Proof.
   intros. intros s h W h' DISJ P'h'. apply W; auto.
 Qed.
 
-Lemma wand_imp_r: forall P Q Q',
+Lemma wand_imp_r: forall {A:Type} (P Q Q':assertion A),
   (Q -->> Q') -> (P --* Q -->> P --* Q').
 Proof.
   intros. intros s h W h' DISJ Ph'. apply H; apply W; auto.
 Qed.
 
-Lemma wand_idem: forall P,
+Lemma wand_idem: forall {A:Type} (P:assertion A),
   emp -->> P --* P.
 Proof.
-  intros P s h E. rewrite E. red. intros. rewrite hunion_empty. auto.
+  intros A P s h E. rewrite E. red. intros. rewrite hunion_empty. auto.
 Qed.
 
-Lemma wand_pure_l: forall (P: Prop) Q,
+Lemma wand_pure_l: forall {A:Type} (P: Prop) (Q:assertion A),
   P -> (pure P --* Q) = Q.
 Proof.
-  intros P Q PP. apply assertion_extensionality. intros h; split.
+  intros A P Q PP. apply assertion_extensionality. intros h; split.
 - intros W. rewrite <- hunion_empty, hunion_comm by HDISJ. apply W. HDISJ. split; auto.
 - intros Qh h' DISJ (Ph' & E). subst h'. rewrite hunion_comm, hunion_empty by HDISJ. auto.
 Qed.
 
-Lemma wand_curry: forall P Q R,
+Lemma wand_curry: forall {A:Type} (P Q R:assertion A),
   (P ** Q --* R) = (P --* Q --* R).
 Proof.
   intros; apply assertion_extensionality; intros h; split.
@@ -501,7 +505,7 @@ Proof.
   rewrite <- hunion_assoc. apply W. HDISJ. auto. HDISJ. auto.
 Qed.
 
-Lemma wand_star: forall P Q R,
+Lemma wand_star: forall {A:Type} (P Q R:assertion A),
   ((P --* Q) ** R ) -->> (P --* (Q ** R)).
 Proof.
   intros; intros s h (h1 & h2 & W1 & R2 & D & U). subst h. intros h' D' Ph'.

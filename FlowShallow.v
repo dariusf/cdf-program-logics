@@ -27,6 +27,7 @@ Inductive eresult : Type :=
 Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
 Definition store := store Z.
+Definition heap := heap Z.
 
 Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
   | eval_pvar : forall s h x v,
@@ -63,8 +64,19 @@ Module ProgramExamples.
 
 End ProgramExamples.
 
+Definition assertion := assertion Z.
 Definition precond := assertion.
 Definition postcond := Z -> assertion.
+
+Definition pts (x: ident) (y: ident) : assertion :=
+  fun s h =>
+    exists v w, Some v = s x /\ Some w = s y /\
+      (contains v w) s h.
+
+Definition ptsval (x: ident) (v: Z) : assertion :=
+  fun s h =>
+    exists w, Some w = s x /\
+      (contains w v) s h.
 
 Inductive result : Type :=
   | norm : Z -> result.

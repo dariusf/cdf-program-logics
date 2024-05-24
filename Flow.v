@@ -30,6 +30,7 @@ Inductive eresult : Type :=
 Reserved Notation " 'eval[' s ',' h ',' e ']' '=>' '[' s1 ',' h1 ',' r ']' " (at level 50, left associativity).
 
 Definition store := store Z.
+Definition heap := heap Z.
 
 Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
   | eval_pvar : forall s h x v,
@@ -65,16 +66,27 @@ Module ProgramExamples.
 
 End ProgramExamples.
 
+Definition assertion := assertion val.
 Definition precond := assertion.
-Definition postcond := Z -> assertion.
+Definition postcond := val -> assertion.
+
+Definition pts (x: ident) (y: ident) : assertion :=
+  fun s h =>
+    exists v w, Some v = s x /\ Some w = s y /\
+      (contains v w) s h.
+
+Definition ptsval (x: ident) (v: val) : assertion :=
+  fun s h =>
+    exists w, Some w = s x /\
+      (contains w v) s h.
 
 Inductive result : Type :=
   | norm : Z -> result.
 
-  Definition compatible r1 r2 :=
-    match (r1, r2) with
-    | (norm r3, enorm r4) => r3 = r4
-  end.
+Definition compatible r1 r2 :=
+  match (r1, r2) with
+  | (norm r3, enorm r4) => r3 = r4
+end.
 
 Inductive flow : Type :=
   | req : precond -> flow
@@ -188,6 +200,7 @@ Proof.
 Qed.
 
 Module SemanticsExamples.
+
 
   (* ex z; req x->z; ens[r] x->1/\r=1 *)
   Definition f3 : flow :=

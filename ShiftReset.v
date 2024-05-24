@@ -19,7 +19,7 @@ Inductive expr : Type :=
   (* https://chargueraud.org/research/2009/ln/main.pdf *)
   | eapp (f:ident) (x:ident)
   | elet (x:ident) (e1:expr) (e2:expr)
-  | eassert (x:assertion)
+  | eassert (x:assertion Z) (* no mutual recursion *)
   | eif (x:ident) (e1:expr) (e2:expr)
   | eshift (e:ident)
   | ereset (e:expr).
@@ -45,6 +45,7 @@ Inductive val : Type :=
   | _ => None. *)
 
 Definition store := store val.
+Definition heap := heap val.
 
 Inductive eresult : Type :=
   | resshift (ve:expr) (vl:expr)

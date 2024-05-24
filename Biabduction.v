@@ -8,6 +8,13 @@ Local Open Scope string_scope.
 Local Open Scope Z_scope.
 Local Open Scope list_scope.
 
+Definition assertion := assertion Z.
+
+Definition pts (x: ident) (y: ident) : assertion :=
+  fun s h =>
+    exists v w, Some v = s x /\ Some w = s y /\
+      (contains v w) s h.
+
 (* like the member predicate. or modulo equivalence? *)
 Inductive split : assertion -> assertion -> assertion -> Prop :=
   | split_one : forall h2 x y,
