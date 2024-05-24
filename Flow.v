@@ -46,6 +46,9 @@ Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     Some v = s x ->
     eval[ s, h, pvar x ]=>[ s, h, enorm v ]
 
+  | eval_plamb : forall s h x e,
+    eval[ s, h, plamb x e ]=>[ s, h, enorm (vclos x e s) ]
+
   | eval_pint : forall s h x,
     eval[ s, h, pint x ] => [ s, h, enorm (vint x) ]
 
@@ -53,6 +56,12 @@ Inductive bigstep : store -> heap -> expr -> store -> heap -> eresult -> Prop :=
     eval[ s, h, e1 ] => [ s1, h1, enorm v] ->
     eval[ supdate x v s1, h1, e2 ] => [ s2, h2, r] ->
     eval[ s, h, plet x e1 e2 ] => [ s2, h2, r ]
+
+  | eval_pcall : forall fn x y e1 sf s h s2 h1 r arg,
+    s fn = Some (vclos y e1 sf) ->
+    s x = Some arg ->
+    eval[ supdate y arg sf, h, e1 ] => [ s2, h1, r ] ->
+    eval[ s, h, pcall fn x ] => [ s, h1, r ]
 
   (* | eval_pref : forall x s (h:heap) l,
     h l = None ->
@@ -387,6 +396,7 @@ Proof.
     specialize (Hsub v x H).
     congruence.
   - inv Hf.
+  - inv Hf.
     inv Hs.
     unfold compatible.
     unfold pureconj in Hq.
@@ -430,4 +440,5 @@ Proof.
     }
     specialize (IHHb2 H4 Hs2).
     easy.
+  - inv Hf.
 Qed.
