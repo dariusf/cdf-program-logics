@@ -28,7 +28,9 @@ Coercion pint : Z >-> expr.
 Inductive val : Type :=
   | vloc (i:Z)
   | vint (i:Z)
-  | vclos (x:ident) (e:expr) (s:store val).
+  (* need to relate free variables used in a lambda formula to those in the captured env *)
+  | vclos (x:ident) (e:expr) (s:store val)
+  .
 
 Coercion vint : Z >-> val.
 
@@ -222,7 +224,6 @@ Qed.
 
 Module SemanticsExamples.
 
-
   (* ex z; req x->z; ens[r] x->1/\r=1 *)
   Definition f3 : flow :=
     fexists "z" (req (pts "x" "z") ;; ens (fun r => (r = 1) //\\ ptsval "x" 1)).
@@ -265,6 +266,11 @@ Inductive forward : expr -> flow -> Prop :=
   | fw_int: forall i p,
     p = (ens (fun res => (res = vint i) //\\ emp)) ->
     forward (pint i) p
+
+  | fw_lamb: forall x p e s,
+    (* cannot check the spec at this point, as lambdas containing flows would be mutually recursive *)
+    p = (ens (fun res => (res = vclos x e s) //\\ emp)) ->
+    forward (plamb x e) p
 
   | fw_var: forall x p,
     p = (ens (fun res s h => exists v, s x = Some v /\ res = v /\ emp s h)) ->
@@ -395,13 +401,22 @@ Proof.
     symmetry in H.
     specialize (Hsub v x H).
     congruence.
-  - inv Hf.
-  - inv Hf.
+  - (* lambda case *)
+    inv Hf.
+    (* destruct H2 as [s0 Hq]. *)
+    (* subst. *)
+    inv Hs.
+    unfold pureconj in Hq.
+    unfold compatible.
+    intuition auto.
+    admit.
+  - (* int *)
+    inv Hf.
     inv Hs.
     unfold compatible.
     unfold pureconj in Hq.
     intuition auto.
-  -
+  - (* let *)
     (* we have an IH for each subexpr *)
     (* v is the intermediate result of evaluating e1 *)
     (* r is the final result *)
@@ -440,5 +455,7 @@ Proof.
     }
     specialize (IHHb2 H4 Hs2).
     easy.
-  - inv Hf.
-Qed.
+  - (* call *)
+  inv Hf.
+(* Qed. *)
+Admitted.
