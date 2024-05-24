@@ -1,5 +1,5 @@
 
-From CDF Require Import Separation2.
+From CDF Require Import Heaps.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
 
 Ltac HUNION n :=

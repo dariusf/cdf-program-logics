@@ -6,7 +6,6 @@ From CDF Require Import Common Heaps.
 
 Local Open Scope Z_scope.
 
-
 (** * 2. Assertions for separation logic *)
 
 Definition assertion (A:Type) : Type := store A -> heap A -> Prop.

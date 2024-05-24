@@ -16,3 +16,5 @@ Tactics.v
 HeapTactics.v
 Outcome.v
 ShiftReset.v
+DeepSeparation.v
+Heaps.v

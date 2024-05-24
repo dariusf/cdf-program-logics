@@ -1,7 +1,7 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From Coq Require Import FunctionalExtensionality PropExtensionality.
-From CDF Require Import Common Sequences Separation2 Tactics.
+From CDF Require Import Common Sequences Separation2 Tactics Heaps.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)

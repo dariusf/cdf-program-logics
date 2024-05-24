@@ -1,5 +1,5 @@
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
-From CDF Require Import Common Sequences Separation2 Tactics HeapTactics.
+From CDF Require Import Common Sequences Separation2 Tactics Heaps HeapTactics.
 (* From Coq Require Import ssreflect ssrfun ssrbool. *)
 
 Local Open Scope string_scope.
