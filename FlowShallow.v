@@ -1,6 +1,7 @@
 
 From Coq Require Import ZArith Lia Bool List String Program.Equality.
 From CDF Require Import Common Sequences Separation2 Tactics HeapTactics Heaps.
+From Coq Require Import FunctionalExtensionality PropExtensionality.
 
 Local Open Scope string_scope.
 (* Local Open Scope nat_scope. *)
@@ -114,9 +115,51 @@ Definition fexists : ident -> flow -> flow := fun i f s1 h1 s2 h2 r =>
   exists v,
     f (supdate i v s1) h1 s2 h2 r.
 
+(* return a new flow that requires/sets x to the previous return value r0, and which can have any return value ig *)
 Definition replace_ret (x:ident) (f:flow) : flow := fun s1 h1 s2 h2 r =>
-  exists v, Some v = s1 x /\
-  f s1 h1 s2 h2 (norm v).
+  exists r0 ig,
+    Some r0 = s1 x /\
+    Some r0 = s2 x /\
+    f s1 h1 s2 h2 (norm r0) /\
+    r = norm ig.
+
+Ltac flow_ext :=
+  apply functional_extensionality; intros s1;
+  apply functional_extensionality; intros h1;
+  apply functional_extensionality; intros s2;
+  apply functional_extensionality; intros h2;
+  apply functional_extensionality; intros r;
+  apply propositional_extensionality.
+
+Example e_rr : forall x,
+  replace_ret x (ens (fun r s h => r = 1)) =
+  ens (fun r s h => exists any, r = any /\ s x = Some 1).
+Proof.
+  intros.
+  unfold replace_ret.
+  unfold ens.
+  flow_ext.
+  split.
+  - intros.
+    destr H.
+    subst.
+    intuition auto.
+    exists H. intuition auto.
+    exists H7.
+    heap.
+    exists H.
+    intuition congruence.
+  - intros.
+    destr H.
+    subst.
+    exists 1.
+    exists H5.
+    intuition auto.
+    exists 1.
+    intuition auto.
+    exists H2.
+    heap.
+Qed.
 
 Definition empty := ens (fun r => pure True).
 
@@ -276,7 +319,6 @@ Section ForwardExamples.
 End ForwardExamples.
 
 Definition wellformed (f:flow) s1 h1 s2 h2 r :=
-  (* satisfies s1 h1 s2 h2 r f -> substore s1 s2. *)
   f s1 h1 s2 h2 r -> substore s1 s2.
 
 Lemma replace_ret_wellformed : forall x f s1 h1 s2 h2 v,
@@ -287,10 +329,9 @@ Proof.
   intros.
   unfold wellformed.
   intros.
-  (* unfold satisfies in H1. *)
   unfold replace_ret in H1; destr H1.
+  unfold wellformed in H0.
   apply H0.
-  (* unfolds. *)
   congruence.
 Qed.
 
@@ -314,15 +355,17 @@ induction H; intros.
   unfold seq in H5. destruct H5 as [s3 [h3 [? [Hrr Hf2]]]]. subst.
 
   (* introduce well-formed lemma on replace_ret *)
+  (* destruct  *)
+  (* Check replace_ret_wellformed. *)
   pose proof (replace_ret_wellformed x f1 (supdate x v s1) h1 s3 h3 v) as Hret.
   rewrite supdate_same in Hret.
-  assert (Some v = Some v) as triv. reflexivity.
-  specialize (Hret triv); clear triv.
+  forward Hret by reflexivity.
 
   (* assuming f1 is wf using the IH, replace_ret f1 is wf *)
   specialize (IHforward1 (supdate x v s1) h1 s3 h3 (norm v)).
   specialize (Hret IHforward1).
   unfold wellformed in Hret.
+  
   specialize (Hret Hrr).
 
   unfold wellformed in IHforward2.
