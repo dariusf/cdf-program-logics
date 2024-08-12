@@ -52,8 +52,8 @@ jobs:
             endGroup
             startGroup "Install Alectryon"
               sudo apt-get update
-              sudo apt-get install -y python3-pip
-              pip install alectryon
+              sudo apt-get install -y pipx python3-pip
+              pipx install alectryon
             endGroup
 
           script: |
