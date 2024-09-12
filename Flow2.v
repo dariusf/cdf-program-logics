@@ -143,7 +143,7 @@ Definition seq : flow -> flow -> flow := fun f1 f2 h1 h2 r =>
 
 Infix ";;" := seq (at level 80, right associativity).
 
-Definition fexists {A:Type} (f:A -> flow) : flow :=
+Definition fex {A:Type} (f:A -> flow) : flow :=
   fun h1 h2 r =>
   exists v,
     (f v) h1 h2 r.
@@ -176,6 +176,11 @@ Ltac fintro :=
   match goal with
   | |- ens _ _ _ (norm ?v) => unfold ens; do 2 eexists; intuition
   | |- pure _ _ => unfold pure; intuition
+  end.
+
+Ltac fexists v :=
+  match goal with
+  | |- fex _ _ _ _ => unfold fex; exists v
   end.
 
 (* Ltac fsteps :=
@@ -236,7 +241,7 @@ Ltac hstep :=
 Module SemanticsExamples.
 
   Definition f1 : flow := ens (fun r => pure (r=vint 1)).
-  Definition f2 : flow := fexists (fun x => req (fun h => x = vint 1)).
+  Definition f2 : flow := fex (fun x => req (fun h => x = vint 1)).
   Definition f3 : flow := f1 ;; f2.
 
   Example ex1: forall h, f1 h h (norm (vint 1)).
@@ -271,13 +276,12 @@ Module SemanticsExamples.
     hstep.
   Qed.
 
-  Example ex3_ret: flow_res f2 (vint 2).
+  Example ex3_req_ret: flow_res f2 (vint 2).
     unfold flow_res.
     exists hempty.
     exists hempty.
     unfold f2.
-    unfold fexists.
-    exists (vint 1).
+    fexists (vint 1).
     unfold req.
     exists hempty.
     intuition.
@@ -316,7 +320,7 @@ Qed. *)
 
   (* ex z; req x->z; ens[r] x->1/\r=1 *)
   (* Definition f3 : flow :=
-    fexists "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
+    fex "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
 
   Example ex_sem_f1:
     f1 sempty hempty sempty hempty (norm 1).
@@ -338,7 +342,7 @@ Qed. *)
       (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1).
   Proof.
     unfold f3.
-    unfold fexists.
+    unfold fex.
     intuition auto.
     exists 3. (* the initial value of z in ex z. x->z, which is given *)
     unfold seq.
@@ -391,12 +395,12 @@ Inductive forward : expr -> flow -> Prop :=
     forward (plet x e1 e2) (f1 ;; f2)
 
   (* | fw_deref: forall x y,
-    forward (pderef x) (fexists y (req (pts x y);;
+    forward (pderef x) (fex y (req (pts x y);;
       ens (fun res s h => ((res = s y) //\\ pts x y) s h)))
 
   | fw_ref: forall x y,
-    (* forward (pref x) (fexists (fun y => ens (fun r s h => contains y (s x) s h))) *)
-    forward (pref x) (fexists y (ens (fun r s h => (r = s y) /\ (pts y x s h)))) *)
+    (* forward (pref x) (fex (fun y => ens (fun r s h => contains y (s x) s h))) *)
+    forward (pref x) (fex y (ens (fun r s h => (r = s y) /\ (pts y x s h)))) *)
 
   (* | fw_get: forall l v, 
     forward (GET l)
@@ -467,7 +471,7 @@ induction H; intros.
   apply substore_refl.
 -
   unfold wellformed; intros.
-  unfold fexists in H2. destruct H2 as [? [v H5]]. subst.
+  unfold fex in H2. destruct H2 as [? [v H5]]. subst.
   unfold seq in H5. destruct H5 as [s3 [h3 [? [Hrr Hf2]]]]. subst.
 
   (* introduce well-formed lemma on replace_ret *)
@@ -544,7 +548,7 @@ such that:
     (* invp Hf [ | |Hff1 Hff2]. *)
     (* inversion Hf as [ Hy Hz |  |Hff1 Hff2 Hz]. subst; clear Hf. *)
     (* the spec is of the form ex x. f1[x/r];f2 *)
-    unfold fexists in Hs. destruct Hs as [Hnotin [v1 Hseq]].
+    unfold fex in Hs. destruct Hs as [Hnotin [v1 Hseq]].
     (* see how it evaluates *)
     unfold seq in Hseq. destruct Hseq as [s3 [h3 [? [Hrr ?]]]].
     unfold replace_ret in Hrr; destruct Hrr as [H10 [H9 H13]].
