@@ -130,11 +130,11 @@ Definition req : precond -> flow := fun p h1 h2 _ =>
   exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p h3.
   (* TODO only true case for now *)
 
-Definition ens : postcond -> flow := fun q h1 h2 r =>
+Definition ens : postcond -> flow := fun q => fun h1 h2 r =>
   (* forall v, r = norm v -> *)
-  exists v, r = norm v /\
+  exists v h3,
   (* h3 is the piece satisfying q that is addded to h1 *)
-    exists h3, h2 = hunion h1 h3 /\ hdisjoint h1 h3 /\ q v h3.
+    r = norm v /\ q v h3 /\ h2 = hunion h1 h3 /\ hdisjoint h1 h3.
 
 Definition seq : flow -> flow -> flow := fun f1 f2 h1 h2 r =>
   exists h3 r1,
@@ -164,7 +164,7 @@ Definition flow_res (f:flow) (v:val) : Prop :=
 Definition empty := ens (fun r => pure True).
 
 (* For reasoning forward from flows in the context *)
-Ltac fstep :=
+Ltac felim :=
   match goal with
   | H : seq _ _ _ _ _ _ _ |- _ => unfold seq in H; destr H
   | H : req _ _ _ _ _ _ |- _ => unfold req in H; destr H; subst
@@ -172,14 +172,20 @@ Ltac fstep :=
   | H : pureconj _ _ _ _ |- _ => unfold pureconj in H; destr H; subst
   end.
 
-Ltac fsteps :=
+Ltac fintro :=
   match goal with
-  | H : seq _ _ _ _ _ _ _ |- _ => fstep; fsteps
-  | H : req _ _ _ _ _ _ |- _ => fstep; fsteps
-  | H : ens _ _ _ _ _ _ |- _ => fstep; fsteps
-  | H : pureconj _ _ _ _ |- _ => fstep; fsteps
-  | _ => idtac
+  | |- ens _ _ _ (norm ?v) => unfold ens; do 2 eexists; intuition
+  | |- pure _ _ => unfold pure; intuition
   end.
+
+(* Ltac fsteps :=
+  match goal with
+  | H : seq _ _ _ _ _ _ _ |- _ => felim; fsteps
+  | H : req _ _ _ _ _ _ |- _ => felim; fsteps
+  | H : ens _ _ _ _ _ _ |- _ => felim; fsteps
+  | H : pureconj _ _ _ _ |- _ => felim; fsteps
+  | _ => idtac
+  end. *)
 
 (* Definition satisfies s1 h1 s2 h2 r (f:flow) := f s1 h1 s2 h2 r. *)
 
@@ -199,6 +205,8 @@ Proof.
 Qed. *)
 
 
+(* solve a heap goal.
+  termination is guaranteed by ordering of lemmas to use *)
 Ltac hstep :=
   match goal with
   (* | [ H: _ = hunion hempty _ |- _ ] =>
@@ -221,7 +229,7 @@ Ltac hstep :=
   | [ |- hunion _ hempty = _ ] =>
       rewrite hunion_comm;
       rewrite hunion_empty *)
-  | [ |- ?g ] => idtac
+  (* | [ |- ?g ] => idtac *)
   end.
 
 
@@ -234,38 +242,40 @@ Module SemanticsExamples.
   Example ex1: forall h, f1 h h (norm (vint 1)).
     intros.
     unfold f1.
-    unfold ens.
-    exists (vint 1).
-    intuition.
-    exists hempty.
-    intuition.
+    fintro.
+    (* unfold ens. *)
+    (* exists (vint 1). *)
+    (* intuition. *)
+    (* exists hempty. *)
+    (* intuition. *)
+    fintro.
+    (* unfold pure. *)
+    (* intuition. *)
     hstep.
     hstep.
-    unfold pure.
-    intuition.
   Qed.
 
   Example ex2_ret: flow_res f1 (vint 1).
-    unfold flow_res.
+    unfold flow_res. exists hempty. exists hempty.
     unfold f1.
-    exists hempty.
-    exists hempty.
-    unfold ens.
+    fintro.
+    (* unfold ens.
     exists (vint 1).
     intuition.
     exists hempty.
-    intuition.
+    intuition. *)
+    fintro.
+    (* unfold pure. *)
+    (* intuition. *)
     hstep.
     hstep.
-    unfold pure.
-    intuition.
   Qed.
 
   Example ex3_ret: flow_res f2 (vint 2).
     unfold flow_res.
+    exists hempty.
+    exists hempty.
     unfold f2.
-    exists hempty.
-    exists hempty.
     unfold fexists.
     exists (vint 1).
     unfold req.
@@ -408,18 +418,12 @@ Section ForwardExamples.
     eapply fw_let.
     - apply fw_val.
     - unfold flow_res.
-      intros.
-      unfold ens.
       exists hempty.
       exists hempty.
-      exists (vint 1).
-      intuition.
-      exists hempty.
-      intuition.
+      fintro.
+      fintro.
       hstep.
       hstep.
-      unfold pure.
-      intuition.
     - simpl.
       apply fw_val.
   Qed.
@@ -625,14 +629,14 @@ Proof.
   intros.
   match goal with | H : bigstep _ _ _ _ _ _ |- _ => inv H end.
   split.
-  - fstep.
-    fstep.
-    fstep.
+  - felim.
+    felim.
+    felim.
     unfold compatible.
     ok.
-  - fstep.
-  fstep.
-  fstep.
+  - felim.
+  felim.
+  felim.
   specialize (flow_det s0 h0 s2 h2 r0 s3 H1 H2 p H H3).
   destr flow_det.
   unfold emp in H4.
