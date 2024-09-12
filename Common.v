@@ -7,6 +7,7 @@ Local Open Scope Z_scope.
 Local Open Scope string_scope.
 
 Definition ident := string.
+Definition ident_eq := string_dec.
 
 Section Store.
 
