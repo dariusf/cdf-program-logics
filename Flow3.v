@@ -129,7 +129,7 @@ Inductive flow :=
 | seq : flow -> flow -> flow
 (* | ffex : forall (A:Type), (A -> flow) -> flow *)
 | ffex : (val -> flow) -> flow
-| unk : ident -> flow
+| unk : ident -> val -> val -> flow (* f(x, r) *)
 .
 
 (* Definition fex {A:Type} (f:A -> flow) : flow :=
@@ -173,7 +173,7 @@ Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
   | s_unk : forall env fn h1 h2 r f x r1,
     env fn = Some f ->
     satisfies env (f x r1) h1 h2 r ->
-    satisfies env (unk fn) h1 h2 r
+    satisfies env (unk fn x r1) h1 h2 r
 
   .
 
@@ -341,15 +341,15 @@ Module SemanticsExamples.
     (* hstep. *)
   Qed.
 
-  Definition f4 : flow := empty ;; unk "f".
+  Definition f4 : flow := empty ;; fex (fun r => unk "f" (vint 1) r).
 
-  Example ex4: forall h, satisfies (eupdate "f" (fun _ _ => ens (fun x => pure (x = vint 1))) empty_env) f4 h h (norm (vint 1)).
+  Example ex4: forall h, satisfies (eupdate "f" (fun x r1 => ens (fun r => pure (r1 = r /\ r = x))) empty_env) f4 h h (norm (vint 1)).
   Proof.
     intros.
     constructor.
     exists h.
     exists (norm (vint 4)).
-    intuition.
+    split.
     - constructor.
     eexists.
     exists hempty.
@@ -357,7 +357,10 @@ Module SemanticsExamples.
     unfold pure. intuition.
     hstep.
     hstep.
-    - eapply s_unk.
+    -
+    eapply s_ffex.
+    exists (vint 1).
+    eapply s_unk.
     (* with (fl := (fun _ _ => ens (fun x : val => pure (x = vint 1)))). *)
     (* Check eupdate_same. *)
     (* rewrite eupdate_same. *)
@@ -372,10 +375,13 @@ Module SemanticsExamples.
     intuition.
     hstep.
     hstep.
-    Unshelve.
-    exact (vint 99).
-    exact (vint 999).
   Qed.
+
+  Definition foldr :=
+  ens (fun _ => pure True) ;;
+    unk "foldr" (vint 1) (vint 1);;
+    unk "f" (vint 2) (vint 1)
+  .
 
 End SemanticsExamples.
 
