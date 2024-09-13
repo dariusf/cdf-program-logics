@@ -149,7 +149,7 @@ Definition fex (f:val -> flow) : flow :=
   end
   . *)
 
-Definition env := ident -> flow.
+Definition env := ident -> option flow.
 
 Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
 
@@ -169,8 +169,10 @@ Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
     (exists v, satisfies env (f v) h1 h2 r) ->
     satisfies env (ffex f) h1 h2 r
 
-  (* | s_unk f : forall env f h1 h2 r,
-    satisfies env (env f) h1 h2 r *)
+  | s_unk : forall env fn h1 h2 r fl,
+    env fn = Some fl ->
+    satisfies env fl h1 h2 r ->
+    satisfies env (unk fn) h1 h2 r
 
   .
 
@@ -185,7 +187,20 @@ Definition flow_res (f:flow) (v:val) : Prop :=
 
 Definition empty := ens (fun r => pure True).
 
-Definition empty_env : env := fun _ => empty.
+Definition empty_env : env := fun _ => None.
+
+Definition eupdate (x: ident) (v: flow) (s: env) : env :=
+  fun y => if string_dec x y then Some v else s y.
+
+
+  Lemma eupdate_same: forall env v l,
+    (eupdate l v env) l = Some v.
+  Proof.
+    intros; cbn.
+    unfold eupdate.
+    destruct (string_dec l l); congruence.
+  Qed.
+
 
 (* For reasoning forward from flows in the context *)
 (* Ltac felim :=
@@ -270,6 +285,7 @@ Module SemanticsExamples.
   Definition f3 : flow := f1 ;; f2.
 
   Example ex1: forall h, satisfies empty_env f1 h h (norm (vint 1)).
+  Proof.
     intros.
     unfold f1.
     (* fintro. *)
@@ -288,6 +304,7 @@ Module SemanticsExamples.
   Qed.
 
   Example ex2_ret: flow_res f1 (vint 1).
+  Proof.
     unfold flow_res.
     exists hempty. exists hempty.
     exists empty_env.
@@ -301,6 +318,7 @@ Module SemanticsExamples.
   Qed.
 
   Example ex3_req_ret: flow_res f2 (vint 2).
+  Proof.
     unfold flow_res.
     exists hempty.
     exists hempty.
@@ -320,6 +338,36 @@ Module SemanticsExamples.
     apply hdisjoint_empty.
     (* hstep. *)
     (* hstep. *)
+  Qed.
+
+  Definition f4 : flow := empty ;; unk "f".
+
+  Example ex4: forall h, satisfies (eupdate "f" (ens (fun x => pure (x = vint 1))) empty_env) f4 h h (norm (vint 1)).
+  Proof.
+    intros.
+    constructor.
+    exists h.
+    exists (norm (vint 4)).
+    intuition.
+    - constructor.
+    eexists.
+    exists hempty.
+    intuition.
+    unfold pure. intuition.
+    hstep.
+    hstep.
+    - apply s_unk with (fl := ens (fun x : val => pure (x = vint 1))).
+    rewrite eupdate_same.
+    auto.
+
+    constructor.
+    eexists.
+    exists hempty.
+    intuition.
+    unfold pure.
+    intuition.
+    hstep.
+    hstep.
   Qed.
 
 End SemanticsExamples.

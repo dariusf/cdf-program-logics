@@ -251,6 +251,7 @@ Module SemanticsExamples.
   Definition f3 : flow := f1 ;; f2.
 
   Example ex1: forall h, f1 h h (norm (vint 1)).
+  Proof.
     intros.
     unfold f1.
     fintro.
@@ -267,6 +268,7 @@ Module SemanticsExamples.
   Qed.
 
   Example ex2_ret: flow_res f1 (vint 1).
+  Proof.
     unfold flow_res. exists hempty. exists hempty.
     unfold f1.
     fintro.
@@ -283,6 +285,7 @@ Module SemanticsExamples.
   Qed.
 
   Example ex3_req_ret: flow_res f2 (vint 2).
+  Proof.
     unfold flow_res.
     exists hempty.
     exists hempty.
