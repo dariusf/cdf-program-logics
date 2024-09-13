@@ -133,6 +133,8 @@ Inductive flow :=
 | disj : flow -> flow -> flow
 .
 
+Infix ";;" := seq (at level 80, right associativity).
+
 (* Definition fex {A:Type} (f:A -> flow) : flow :=
   ffex A f. *)
 
@@ -186,8 +188,9 @@ Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
 
   .
 
-
-Infix ";;" := seq (at level 80, right associativity).
+Definition entails (f1 f2:flow) : Prop :=
+  forall h1 h2 r env,
+    satisfies env f1 h1 h2 r -> satisfies env f2 h1 h2 r.
 
 Definition flow_res (f:flow) (v:val) : Prop :=
   exists h1 h2 env, satisfies env f h1 h2 (norm v).
@@ -351,7 +354,7 @@ Module SemanticsExamples.
   Qed.
 
   Definition f4 : flow := empty ;; fex (fun r => unk "f" (vint 1) r).
-  Definition f4_env : env := eupdate "f" (fun _ r => ens (fun r1 => pure (r = vint 2)) ) empty_env.
+  Definition f4_env : env := eupdate "f" (fun _ r => ens (fun r1 => pure (r = vint 2))) empty_env.
 
   (* has to be 2 *)
   Example ex5_f_ret: flow_res f4 (vint 2).
@@ -360,7 +363,7 @@ Module SemanticsExamples.
     exists hempty. exists hempty. exists f4_env.
     unfold f4.
     (* fintro. *)
-    econstructor. exists hempty. exists (norm (vint 7)). intuition.
+    constructor. exists hempty. exists (norm (vint 7)). intuition.
     (* fintro. *)
     constructor.
     eexists.
@@ -417,10 +420,55 @@ Module SemanticsExamples.
     hstep.
   Qed.
 
+  Definition f5 : flow := ens (fun r => pure (r = vint 2)).
+  Definition f6 : flow := f1 ;; ens (fun r => pure (r = vint 2)).
+
+  Example ex6_ent : entails f5 f6.
+  Proof.
+    unfold entails.
+    unfold f5.
+    unfold f6.
+    intros.
+    inv H.
+    destruct H2 as (v & h3 & H1 & H2 & H3 & H4).
+    subst r.
+    constructor.
+    exists h1.
+    exists (norm (vint 1)).
+    intuition.
+
+    - unfold f1.
+      constructor.
+      exists (vint 1).
+      exists hempty.
+      intuition.
+      unfold pure.
+      intuition.
+      hstep.
+      hstep.
+
+    -
+      constructor.
+      eexists.
+      exists hempty.
+      intuition.
+      unfold pure.
+      intuition.
+      unfold pure in H2.
+      intuition auto.
+      unfold pure in H2.
+      destruct H2.
+      subst.
+      auto.
+      hstep.
+  Qed.
+
   Definition foldr :=
   ens (fun _ => pure True) ;;
-    unk "foldr" (vint 1) (vint 1);;
-    unk "f" (vint 2) (vint 1)
+  disj
+    (unk "f" (vint 2) (vint 3))
+    (unk "foldr" (vint 1) (vint 1);;
+      unk "f" (vint 2) (vint 1))
   .
 
 End SemanticsExamples.
