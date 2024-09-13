@@ -7,7 +7,7 @@ CSL.v
 Delay.v
 Monads.v
 Trace.v
-Flow2.v
+FlowShallowRec.v
 Flow3.v
 FlowShallow.v
 FlowDeep.v
