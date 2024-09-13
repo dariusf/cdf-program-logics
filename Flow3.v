@@ -210,14 +210,98 @@ Instance entails_trans : Transitive entails.
 Proof.
   unfold Transitive.
   intros.
-  unfold entails in H.
-  unfold entails in H0.
-  unfold entails.
+  unfold entails in *.
   intros.
   apply H0.
   apply H.
   apply H1.
 Qed.
+
+Definition bientails (f1 f2:flow) : Prop :=
+  forall h1 h2 r env,
+    satisfies env f1 h1 h2 r <-> satisfies env f2 h1 h2 r.
+
+Lemma req_sep_combine : forall P Q,
+  entails (req P;; req Q) (req (P ** Q)).
+Proof.
+  unfold entails.
+  intros.
+  inv H.
+  destruct H6 as (h3 & r1 & H1 & H2).
+  (* h3 is the heap after taking away the part satisfying P *)
+  
+  inv H1.
+  inv H2.
+  destruct H3 as (h4 & ? & ? & ?).
+  destruct H1 as (h5 & ? & ? & ?).
+  (* h4 is the part satisfying P, same for h5/Q *)
+  constructor.
+  (* union h4/h5 to get the part satisfying P*Q *)
+  (* TODO *)
+  assert (hdisjoint h4 h5).
+  (* Search hdisjoint. *)
+  (* Search hunion. *)
+  (* Search (hunion ?a _ = hunion ?a _). *)
+  subst h3.
+  rewrite hdisjoint_union_l in H0.
+  destruct H0.
+  rewrite hdisjoint_sym in H1.
+  easy.
+
+  exists (hunion h4 h5).
+  intuition.
+  subst h3.
+  rewrite hunion_assoc in H.
+  rewrite H.
+  (* rewrite <- hunion_invert_r. *)
+  assert (hunion h4 h5 = hunion h5 h4). rewrite hunion_comm. reflexivity.
+  apply hdisjoint_sym.
+  easy.
+  
+  rewrite H1.
+  reflexivity.
+
+  
+  rewrite hdisjoint_union_r.
+
+  intuition.
+
+  subst h3.
+  rewrite hdisjoint_union_l in H0.
+  intuition.
+
+  unfold sepconj.
+  exists h4. exists h5.
+
+  intuition.
+
+  (* unfold bientails. *)
+  (* split. *)
+  (* intros. *)
+  (* h1 is initial heap *)
+  (* h2 is final *)
+  (* h3 is the part taken off by P * Q *)
+  (* { inv H. destruct H2 as (h3 & H1 & H2 & H3).
+    constructor.
+    admit. } *)
+  (* { admit. } *)
+Qed.
+
+(* Lemma req_sep : forall P Q,
+  bientails (req (P ** Q)) (req P;; req Q).
+Proof.
+  intros.
+  unfold bientails.
+  split.
+  intros.
+  (* h1 is initial heap *)
+  (* h2 is final *)
+  (* h3 is the part taken off by P * Q *)
+  { inv H. destruct H2 as (h3 & H1 & H2 & H3).
+    constructor.
+    admit. }
+  { admit. }
+Qed. *)
 
 Definition flow_res (f:flow) (v:val) : Prop :=
   exists h1 h2 env, satisfies env f h1 h2 (norm v).
