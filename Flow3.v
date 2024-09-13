@@ -123,71 +123,90 @@ Inductive result : Type :=
     | (norm r3, enorm r4) => r3 = r4
   end.
 
-Definition flow := heap -> heap -> result -> Prop.
+Inductive flow :=
+| req : precond -> flow
+| ens : postcond -> flow
+| seq : flow -> flow -> flow
+(* | ffex : forall (A:Type), (A -> flow) -> flow *)
+| ffex : (val -> flow) -> flow
+| unk : ident -> flow
+.
 
-Definition req : precond -> flow := fun p h1 h2 _ =>
-  (* s1 = s2 /\ *)
-  (* h3 is the piece taken out satisfying p *)
-  exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p h3.
-  (* TODO only true case for now *)
+(* Definition fex {A:Type} (f:A -> flow) : flow :=
+  ffex A f. *)
 
-Definition ens : postcond -> flow := fun q => fun h1 h2 r =>
-  (* forall v, r = norm v -> *)
-  exists v h3,
-  (* h3 is the piece satisfying q that is addded to h1 *)
-    r = norm v /\ q v h3 /\ h2 = hunion h1 h3 /\ hdisjoint h1 h3.
+Definition fex (f:val -> flow) : flow :=
+  ffex f.
 
-Definition seq : flow -> flow -> flow := fun f1 f2 h1 h2 r =>
-  exists h3 r1,
-  f1 h1 h3 r1 /\
-  f2 h3 h2 r.
 
-(* Definition unknown : ident -> val -> val -> flow := fun h1 h2 r =>
-  exists h3 r1,
-  f1 h1 h3 r1 /\
-  f2 h3 h2 r. *)
+(* Fixpoint satisfies (env:env) (f:flow) (h1 h2:heap) (r:result) : Prop :=
+  match f with
+  | req p => exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p h3
+  | ens q => exists v h3, r = norm v /\ q v h3 /\ h2 = hunion h1 h3 /\ hdisjoint h1 h3
+  | seq f1 f2 => exists h3 r1, satisfies env f1 h1 h3 r1 /\ satisfies env f2 h3 h2 r
+  | ffex a f => exists v, satisfies env (f v) h1 h2 r
+  | unk f => satisfies env (env f) h1 h2 r
+  end
+  . *)
+
+Definition env := ident -> flow.
+
+Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
+
+  | s_req : forall env p h1 h2 r,
+    (exists h3, h1 = hunion h2 h3 /\ hdisjoint h2 h3 /\ p h3) ->
+    satisfies env (req p) h1 h2 r
+
+  | s_ens : forall env q h1 h2 r,
+    (exists v h3, r = norm v /\ q v h3 /\ h2 = hunion h1 h3 /\ hdisjoint h1 h3) ->
+    satisfies env (ens q) h1 h2 r
+
+  | s_seq : forall env f1 f2 h1 h2 r,
+    (exists h3 r1, satisfies env f1 h1 h3 r1 /\ satisfies env f2 h3 h2 r) -> satisfies env (seq f1 f2) h1 h2 r
+
+  (* | s_ffex (a:Type) (f:a->flow) : forall env h1 h2 r x, *)
+  | s_ffex : forall env f h1 h2 r,
+    (exists v, satisfies env (f v) h1 h2 r) ->
+    satisfies env (ffex f) h1 h2 r
+
+  (* | s_unk f : forall env f h1 h2 r,
+    satisfies env (env f) h1 h2 r *)
+
+  .
+
 
 Infix ";;" := seq (at level 80, right associativity).
 
-Definition fex {A:Type} (f:A -> flow) : flow :=
-  fun h1 h2 r =>
-  exists v,
-    (f v) h1 h2 r.
-
-(* Definition replace_ret (v:val) (f:flow) : flow := fun h1 h2 r =>
-  (* exists v, Some v = s1 x /\ *)
-  (* f s1 h1 s2 h2 (norm v). *)
-  (* f h1 h2 (norm v) *)
-  r = (norm v) 
-  . *)
-
 Definition flow_res (f:flow) (v:val) : Prop :=
-  exists h1 h2, f h1 h2 (norm v).
+  exists h1 h2 env, satisfies env f h1 h2 (norm v).
 
 (* Definition replace_ret (v:val) (f:flow) : flow :=
   f ;; ens (fun r => pure (r = v)). *)
 
 Definition empty := ens (fun r => pure True).
 
+Definition empty_env : env := fun _ => empty.
+
 (* For reasoning forward from flows in the context *)
-Ltac felim :=
+(* Ltac felim :=
   match goal with
   | H : seq _ _ _ _ _ _ _ |- _ => unfold seq in H; destr H
   | H : req _ _ _ _ _ _ |- _ => unfold req in H; destr H; subst
   | H : ens _ _ _ _ _ _ |- _ => unfold ens in H; destr H; subst
   | H : pureconj _ _ _ _ |- _ => unfold pureconj in H; destr H; subst
-  end.
+  end. *)
 
-Ltac fintro :=
+(* Ltac fintro :=
   match goal with
-  | |- ens _ _ _ (norm ?v) => unfold ens; do 2 eexists; intuition
+  (* | |- ens _ _ _ (norm ?v) => unfold ens; do 2 eexists; intuition *)
+  | |- satisfies (ens _) _ _ _ (norm ?v) => econstructor; eexists; intuition
   | |- pure _ _ => unfold pure; intuition
   end.
 
 Ltac fexists v :=
   match goal with
   | |- fex _ _ _ _ => unfold fex; exists v
-  end.
+  end. *)
 
 (* Ltac fsteps :=
   match goal with
@@ -250,34 +269,33 @@ Module SemanticsExamples.
   Definition f2 : flow := fex (fun x => req (fun h => x = vint 1)).
   Definition f3 : flow := f1 ;; f2.
 
-  Example ex1: forall h, f1 h h (norm (vint 1)).
+  Example ex1: forall h, satisfies empty_env f1 h h (norm (vint 1)).
     intros.
     unfold f1.
-    fintro.
-    (* unfold ens. *)
-    (* exists (vint 1). *)
-    (* intuition. *)
-    (* exists hempty. *)
-    (* intuition. *)
-    fintro.
-    (* unfold pure. *)
-    (* intuition. *)
-    hstep.
-    hstep.
+    (* fintro. *)
+    apply s_ens.
+    econstructor. eexists. intuition.
+    (* fintro. *)
+    unfold pure. intuition.
+    rewrite hunion_comm.
+    rewrite hunion_empty.
+    reflexivity.
+    apply hdisjoint_empty.
+    rewrite hdisjoint_sym.
+    apply hdisjoint_empty.
+    (* hstep. *)
+    (* hstep. *)
   Qed.
 
   Example ex2_ret: flow_res f1 (vint 1).
-    unfold flow_res. exists hempty. exists hempty.
+    unfold flow_res.
+    exists hempty. exists hempty.
+    exists empty_env.
     unfold f1.
-    fintro.
-    (* unfold ens.
-    exists (vint 1).
-    intuition.
-    exists hempty.
-    intuition. *)
-    fintro.
-    (* unfold pure. *)
-    (* intuition. *)
+    (* fintro. *)
+    econstructor. eexists. eexists. intuition.
+    (* fintro. *)
+    unfold pure. intuition.
     hstep.
     hstep.
   Qed.
@@ -286,101 +304,23 @@ Module SemanticsExamples.
     unfold flow_res.
     exists hempty.
     exists hempty.
+    exists empty_env.
     unfold f2.
-    fexists (vint 1).
-    unfold req.
-    exists hempty.
+    (* eexists. *)
+    (* fexists (vint 1). *)
+    (* unfold req. *)
+    apply (s_ffex).
+    eexists.
+    constructor.
+    eexists.
+    (* exists hempty. *)
     intuition.
-    hstep.
-    hstep.
+    rewrite hunion_empty.
+    auto.
+    apply hdisjoint_empty.
+    (* hstep. *)
+    (* hstep. *)
   Qed.
-
-  (* Example ex2: forall h, (replace_ret (vint 2) f1) h h (norm (vint 2)).
-    intros.
-    unfold f1.
-    unfold replace_ret.
-    unfold seq.
-    exists h.
-    exists (norm (vint 1)).
-    split.
-    - unfold ens.
-      exists (vint 1).
-      intuition.
-      exists hempty.
-      intuition.
-    hstep.
-    hstep.
-    unfold pure.
-    intuition.
-    - unfold ens.
-      exists (vint 2).
-      intuition.
-      exists hempty.
-      intuition.
-    hstep.
-    hstep.
-    intuition.
-    unfold pure.
-    intuition.
-Qed. *)
-
-  (* ex z; req x->z; ens[r] x->1/\r=1 *)
-  (* Definition f3 : flow :=
-    fex "z" (req (pts "x" "z") ;; ens (fun r => (r=1) //\\ ptsval "x" 1)).
-
-  Example ex_sem_f1:
-    f1 sempty hempty sempty hempty (norm 1).
-    (* sem[true, sempty, hempty]=>[true, sempty, hempty, norm(1)] |= f1. *)
-  Proof.
-    unfold f1.
-    unfold ens.
-    intuition auto.
-    exists 1.
-    intuition.
-    exists hempty.
-    heap.
-    unfold pure.
-    intuition auto.
-  Qed.
-
-  Example ex_sem_f3:
-    f3 (supdate "x" 2 sempty) (hupdate 2 3 hempty) 
-      (supdate "z" 3 (supdate "x" 2 sempty)) (hupdate 2 1 hempty) (norm 1).
-  Proof.
-    unfold f3.
-    unfold fex.
-    intuition auto.
-    exists 3. (* the initial value of z in ex z. x->z, which is given *)
-    unfold seq.
-    intuition auto.
-    exists (supdate "z" 3 (supdate "x" 2 sempty)).
-    exists hempty.
-    exists (norm 5). (* ret of req, can be anything *)
-    split.
-    - unfold req.
-      intuition auto.
-      exists (hupdate 2 3 hempty).
-      heap.
-      unfold pts.
-      unfold contains.
-      rewrite supdate_other; try congruence.
-      rewrite supdate_same.
-      rewrite supdate_same.
-      eauto.
-    - unfold ens.
-      intuition auto.
-      exists 1.
-      intuition auto.
-      exists (hupdate 2 1 hempty).
-      heap.
-      unfold pureconj.
-      intuition auto.
-      unfold ptsval.
-      unfold contains.
-      rewrite supdate_other; try congruence.
-      rewrite supdate_same.
-      eauto.
-  Qed. *)
 
 End SemanticsExamples.
 
@@ -430,10 +370,21 @@ Section ForwardExamples.
     - unfold flow_res.
       exists hempty.
       exists hempty.
-      fintro.
+      exists empty_env.
+      constructor.
+      intuition.
+      eexists.
+      eexists.
+      eexists.
+      auto.
+      unfold pure. intuition.
+      rewrite hunion_empty.
+      reflexivity.
+      apply hdisjoint_empty.
+      (* fintro.
       fintro.
       hstep.
-      hstep.
+      hstep. *)
     - simpl.
       apply fw_val.
   Qed.
