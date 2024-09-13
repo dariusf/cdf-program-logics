@@ -1,5 +1,5 @@
 
-From Coq Require Import ZArith Lia Bool List String Program.Equality.
+From Coq Require Import ZArith Lia Bool List String Program.Equality Classes.RelationClasses.
 From CDF Require Import Common Sequences Separation Tactics HeapTactics.
 
 Local Open Scope string_scope.
@@ -191,6 +191,33 @@ Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
 Definition entails (f1 f2:flow) : Prop :=
   forall h1 h2 r env,
     satisfies env f1 h1 h2 r -> satisfies env f2 h1 h2 r.
+
+Infix "⊑" := entails (at level 90, right associativity
+  , only parsing
+  ).
+
+(* Unset Printing Notations. Set Printing Coercions. Set Printing Parentheses. *)
+(* Check (forall f1 f2 f3, f1 ;; f3 ⊑ f2). *)
+
+Instance entails_refl : Reflexive entails.
+Proof.
+  unfold Reflexive.
+  unfold entails. intros.
+  exact H.
+Qed.
+
+Instance entails_trans : Transitive entails.
+Proof.
+  unfold Transitive.
+  intros.
+  unfold entails in H.
+  unfold entails in H0.
+  unfold entails.
+  intros.
+  apply H0.
+  apply H.
+  apply H1.
+Qed.
 
 Definition flow_res (f:flow) (v:val) : Prop :=
   exists h1 h2 env, satisfies env f h1 h2 (norm v).
@@ -423,7 +450,7 @@ Module SemanticsExamples.
   Definition f5 : flow := ens (fun r => pure (r = vint 2)).
   Definition f6 : flow := f1 ;; ens (fun r => pure (r = vint 2)).
 
-  Example ex6_ent : entails f5 f6.
+  Example ex6_ent : f5 ⊑ f6.
   Proof.
     unfold entails.
     unfold f5.
@@ -461,6 +488,12 @@ Module SemanticsExamples.
       subst.
       auto.
       hstep.
+  Qed.
+ 
+  Example ex7_rewrite : f5 ⊑ f6.
+  Proof.
+    rewrite ex6_ent.
+    apply entails_refl.
   Qed.
 
   Definition foldr :=
