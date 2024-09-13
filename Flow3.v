@@ -130,6 +130,7 @@ Inductive flow :=
 (* | ffex : forall (A:Type), (A -> flow) -> flow *)
 | ffex : (val -> flow) -> flow
 | unk : ident -> val -> val -> flow (* f(x, r) *)
+| disj : flow -> flow -> flow
 .
 
 (* Definition fex {A:Type} (f:A -> flow) : flow :=
@@ -170,10 +171,18 @@ Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
     (exists v, satisfies env (f v) h1 h2 r) ->
     satisfies env (ffex f) h1 h2 r
 
-  | s_unk : forall env fn h1 h2 r f x r1,
+  | s_unk : forall env fn h1 h2 r f x,
     env fn = Some f ->
-    satisfies env (f x r1) h1 h2 r ->
-    satisfies env (unk fn x r1) h1 h2 r
+    satisfies env (f x r) h1 h2 (norm r) ->
+    satisfies env (unk fn x r) h1 h2 (norm r)
+
+  | s_disj_l : forall env h1 h2 r f1 f2,
+    satisfies env f1 h1 h2 r ->
+    satisfies env (disj f1 f2) h1 h2 r
+
+  | s_disj_r : forall env h1 h2 r f1 f2,
+    satisfies env f2 h1 h2 r ->
+    satisfies env (disj f1 f2) h1 h2 r
 
   .
 
@@ -342,6 +351,37 @@ Module SemanticsExamples.
   Qed.
 
   Definition f4 : flow := empty ;; fex (fun r => unk "f" (vint 1) r).
+  Definition f4_env : env := eupdate "f" (fun _ r => ens (fun r1 => pure (r = vint 2)) ) empty_env.
+
+  (* has to be 2 *)
+  Example ex5_f_ret: flow_res f4 (vint 2).
+  Proof.
+    unfold flow_res.
+    exists hempty. exists hempty. exists f4_env.
+    unfold f4.
+    (* fintro. *)
+    econstructor. exists hempty. exists (norm (vint 7)). intuition.
+    (* fintro. *)
+    constructor.
+    eexists.
+    exists hempty.
+    unfold pure. intuition.
+    hstep.
+    hstep.
+    constructor.
+    exists (vint 2).
+    econstructor.
+    unfold f4_env.
+    apply eupdate_same.
+    constructor.
+    exists (vint 2).
+    exists hempty.
+    intuition.
+    unfold pure.
+    intuition.
+    hstep.
+    hstep.
+  Qed.
 
   Example ex4: forall h, satisfies (eupdate "f" (fun x r1 => ens (fun r => pure (r1 = r /\ r = x))) empty_env) f4 h h (norm (vint 1)).
   Proof.
