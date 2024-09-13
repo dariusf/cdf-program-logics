@@ -149,7 +149,8 @@ Definition fex (f:val -> flow) : flow :=
   end
   . *)
 
-Definition env := ident -> option flow.
+Definition ufun := val -> val -> flow.
+Definition env := ident -> option ufun.
 
 Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
 
@@ -169,9 +170,9 @@ Inductive satisfies : env -> flow -> heap -> heap -> result -> Prop :=
     (exists v, satisfies env (f v) h1 h2 r) ->
     satisfies env (ffex f) h1 h2 r
 
-  | s_unk : forall env fn h1 h2 r fl,
-    env fn = Some fl ->
-    satisfies env fl h1 h2 r ->
+  | s_unk : forall env fn h1 h2 r f x r1,
+    env fn = Some f ->
+    satisfies env (f x r1) h1 h2 r ->
     satisfies env (unk fn) h1 h2 r
 
   .
@@ -189,7 +190,7 @@ Definition empty := ens (fun r => pure True).
 
 Definition empty_env : env := fun _ => None.
 
-Definition eupdate (x: ident) (v: flow) (s: env) : env :=
+Definition eupdate (x: ident) (v: ufun) (s: env) : env :=
   fun y => if string_dec x y then Some v else s y.
 
 
@@ -342,7 +343,7 @@ Module SemanticsExamples.
 
   Definition f4 : flow := empty ;; unk "f".
 
-  Example ex4: forall h, satisfies (eupdate "f" (ens (fun x => pure (x = vint 1))) empty_env) f4 h h (norm (vint 1)).
+  Example ex4: forall h, satisfies (eupdate "f" (fun _ _ => ens (fun x => pure (x = vint 1))) empty_env) f4 h h (norm (vint 1)).
   Proof.
     intros.
     constructor.
@@ -356,9 +357,12 @@ Module SemanticsExamples.
     unfold pure. intuition.
     hstep.
     hstep.
-    - apply s_unk with (fl := ens (fun x : val => pure (x = vint 1))).
-    rewrite eupdate_same.
-    auto.
+    - eapply s_unk.
+    (* with (fl := (fun _ _ => ens (fun x : val => pure (x = vint 1)))). *)
+    (* Check eupdate_same. *)
+    (* rewrite eupdate_same. *)
+    eapply eupdate_same.
+    (* auto. *)
 
     constructor.
     eexists.
@@ -368,6 +372,9 @@ Module SemanticsExamples.
     intuition.
     hstep.
     hstep.
+    Unshelve.
+    exact (vint 99).
+    exact (vint 999).
   Qed.
 
 End SemanticsExamples.
